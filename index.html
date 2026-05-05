@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuessr Flag Trainer</title>
+    <title>FlagGuessr</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- D3.js -->
@@ -70,8 +70,11 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
             <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
-                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Streak</span>
-                <span id="score" class="text-2xl font-black text-blue-400">0</span>
+                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Score</span>
+                <div class="flex items-baseline gap-1">
+                    <span id="score" class="text-2xl font-black text-blue-400">0</span>
+                    <span class="text-sm font-bold text-slate-500">/ <span id="total-countries">0</span></span>
+                </div>
             </div>
             <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
                 <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Mode</span>
@@ -104,7 +107,8 @@
     <!-- Main Menu Overlay -->
     <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-40 hidden flex-col items-center justify-center">
         <div class="bg-slate-800 p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-lg w-full mx-4">
-            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">FlagMaster</h1>
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-1 pb-2 tracking-wide">FlagGuessr</h1>
+            <div class="text-xs text-slate-500 font-semibold mb-6 uppercase tracking-widest">By Neowise</div>
             <p class="text-slate-400 mb-8">Select your practice mode</p>
             
             <div class="space-y-4 mb-8">
@@ -133,7 +137,7 @@
             </p>
             
             <div class="mb-6">
-                <div class="text-sm text-slate-400 mb-1">Final Streak</div>
+                <div class="text-sm text-slate-400 mb-1">Final Score</div>
                 <div id="final-score" class="text-5xl font-black text-white">0</div>
             </div>
 
@@ -345,6 +349,8 @@
             document.getElementById("score").innerText = score;
             svg.call(zoom.transform, d3.zoomIdentity); // Reset zoom
             renderMap(activeDictionary); // Re-render with active list
+            
+            document.getElementById("total-countries").innerText = availableCountries.length;
             
             startRound();
         }
