@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FlagGuessr | Pro</title>
+    <title>FlagGuessr | Global</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -14,30 +14,30 @@
 
     <style>
         body { margin: 0; overflow: hidden; background-color: #aad3df; touch-action: none; }
-        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; }
+        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; z-index: 1; }
         
-        .map-label {
+        /* Hide default map labels to prevent duplicates */
+        .leaflet-tile-pane { filter: contrast(110%) brightness(105%); }
+        .leaflet-layer:nth-child(2) { display: none !important; } /* Specifically targets label overlays */
+
+        .country-label {
             background: transparent; border: none; box-shadow: none;
-            color: #374151; text-align: center; pointer-events: none;
+            font-family: 'Times New Roman', serif; font-weight: 700; font-size: 14px; color: #000;
+            text-shadow: 1px 1px 0px white, -1px -1px 0px white;
+            text-anchor: middle; pointer-events: none; opacity: 1;
             transition: opacity 0.2s ease;
         }
-
+        
         .label-continent {
-            font-size: 16px; font-weight: 900; text-transform: uppercase;
-            letter-spacing: 0.4em; color: #1e293b; opacity: 0.5;
+            font-family: sans-serif; font-size: 16px; font-weight: 900; 
+            text-transform: uppercase; letter-spacing: 0.4em; color: #1e293b; opacity: 0.5;
         }
 
-        .label-country {
-            font-family: serif; font-size: 13px; font-weight: 700;
-            text-shadow: 1px 1px 0px white, -1px -1px 0px white;
-        }
-        
-        .hidden-label { opacity: 0 !important; }
-        
+        .hide-labels .country-label { opacity: 0 !important; }
         #game-ui { padding-top: env(safe-area-inset-top); }
         .stat-box { 
             background-color: #1e293b; border: 1px solid #334155; 
-            border-radius: 0.5rem; min-width: 65px; padding: 4px 8px;
+            border-radius: 0.5rem; min-width: 65px; padding: 4px;
             display: flex; flex-direction: column; align-items: center;
         }
         .flag-loading { animation: pulse 1.5s infinite; }
@@ -46,28 +46,28 @@
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- Adaptive Top Menu -->
+    <!-- Top Adaptive Menu -->
     <div id="game-ui" class="fixed top-0 left-0 w-full bg-[#0f172a]/95 border-b border-slate-700 z-[2000] hidden flex items-center justify-between px-4 py-3">
         <div class="flex items-center gap-2">
-            <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-lg">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            <button onclick="location.reload()" class="bg-slate-700 p-2.5 rounded-lg active:scale-95 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
             <div class="stat-box">
-                <span class="text-[10px] text-slate-400 font-bold uppercase">Score</span>
-                <span id="score" class="text-xl font-black text-blue-400">0</span>
+                <span class="text-[9px] text-slate-400 font-bold uppercase">Score</span>
+                <span id="score" class="text-lg font-black text-blue-400 leading-none">0</span>
             </div>
         </div>
 
         <div class="absolute left-1/2 -translate-x-1/2">
-            <div class="h-14 w-24 md:h-16 md:w-32 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-xl">
+            <div class="h-14 w-24 md:h-16 md:w-32 bg-slate-800 rounded border border-slate-600 overflow-hidden flex items-center justify-center">
                 <div id="flag-loader" class="text-slate-500 text-xs flag-loading hidden">...</div>
                 <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
             </div>
         </div>
 
         <div class="stat-box">
-            <span class="text-[10px] text-slate-400 font-bold uppercase">Mode</span>
-            <span id="current-mode-display" class="text-xs font-bold text-amber-400 mt-0.5">...</span>
+            <span class="text-[9px] text-slate-400 font-bold uppercase">Mode</span>
+            <span id="current-mode-display" class="text-[10px] font-bold text-amber-400">...</span>
         </div>
     </div>
 
@@ -75,28 +75,13 @@
 
     <!-- Main Menu -->
     <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 z-[3000] flex flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 md:p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-sm w-full">
-            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">FlagGuessr</h1>
-            <div id="db-status" class="text-[10px] font-bold mb-8 text-amber-400 italic tracking-widest">CONNECTING...</div>
-            
-            <div id="menu-buttons" class="space-y-4 mb-8 opacity-50 pointer-events-none transition-opacity duration-500">
-                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg">Duel Practice</button>
-                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg">Arbitrary World</button>
+        <div class="bg-slate-800 p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-xs w-full">
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-6">FlagGuessr</h1>
+            <div class="space-y-4 mb-8">
+                <button onclick="startGame('duel')" class="w-full bg-blue-600 font-bold py-4 rounded-xl shadow-lg">Duel Practice</button>
+                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 font-bold py-4 rounded-xl shadow-lg">Arbitrary World</button>
             </div>
-            <button onclick="showLeaderboard()" class="text-slate-300 underline text-sm">View Global Leaderboard</button>
-        </div>
-    </div>
-
-    <!-- Leaderboard Modal -->
-    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-[5000] hidden flex flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 max-w-lg w-full flex flex-col max-h-[80vh]">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black">Global High Scores</h2>
-                <button onclick="document.getElementById('leaderboard-modal').classList.add('hidden')" class="text-slate-400 text-2xl">✖</button>
-            </div>
-            <div class="overflow-y-auto flex-1">
-                <table class="w-full text-left"><tbody id="leaderboard-body"></tbody></table>
-            </div>
+            <div id="db-status" class="text-[10px] font-bold text-green-400 italic">SYSTEM READY</div>
         </div>
     </div>
 
@@ -105,115 +90,100 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        const continentMarkers = [
-            { name: "Europe", pos: [50, 15] }, { name: "Africa", pos: [5, 20] }, 
-            { name: "Asia", pos: [35, 90] }, { name: "North America", pos: [45, -100] }, 
-            { name: "South America", pos: [-20, -60] }, { name: "Oceania", pos: [-25, 140] }
+        const continents = [
+            { name: "EUROPE", pos: [50, 15] }, { name: "AFRICA", pos: [5, 20] }, 
+            { name: "ASIA", pos: [35, 90] }, { name: "N. AMERICA", pos: [45, -100] }, 
+            { name: "S. AMERICA", pos: [-20, -60] }, { name: "OCEANIA", pos: [-25, 140] }
         ];
 
         const duelIDs = ["USA", "CAN", "MEX", "BRA", "ARG", "COL", "PER", "CHL", "GBR", "FRA", "DEU", "ITA", "ESP", "SWE", "NOR", "FIN", "POL", "RUS", "ZAF", "KEN", "NGA", "AUS", "NZL", "JPN", "KOR", "IND", "IDN", "THA", "MYS", "PHL", "VNM", "TUR", "EGY", "ISL", "IRL", "PRT", "CHE", "AUT", "CZE", "SVK", "HUN", "ROU", "BGR", "GRC", "HRV", "SRB", "UKR", "ARE", "ISR", "SAU", "BWA", "SEN", "GHA", "TUN", "MAR", "URY", "ECU", "BOL", "PRY", "GTM", "CRI", "PAN", "DOM", "TWN", "MNG", "KAZ", "KGZ", "BTN", "BGD", "LKA", "KHM", "ALB", "MNE", "BIH", "MKD", "SVN", "BEL", "NLD", "DNK", "EST", "LVA", "LTU", "LUX", "SGP"];
         const countryCodes = { "USA": "us", "CAN": "ca", "MEX": "mx", "BRA": "br", "ARG": "ar", "COL": "co", "PER": "pe", "CHL": "cl", "GBR": "gb", "FRA": "fr", "DEU": "de", "ITA": "it", "ESP": "es", "SWE": "se", "NOR": "no", "FIN": "fi", "POL": "pl", "RUS": "ru", "ZAF": "za", "KEN": "ke", "NGA": "ng", "AUS": "au", "NZL": "nz", "JPN": "jp", "KOR": "kr", "IND": "in", "IDN": "id", "THA": "th", "MYS": "my", "PHL": "ph", "VNM": "vn", "TUR": "tr", "EGY": "eg", "ISL": "is", "IRL": "ie", "PRT": "pt", "CHE": "ch", "AUT": "at", "CZE": "cz", "SVK": "sk", "HUN": "hu", "ROU": "ro", "BGR": "bg", "GRC": "gr", "HRV": "hr", "SRB": "rs", "UKR": "ua", "ARE": "ae", "ISR": "il", "SAU": "sa", "BWA": "bw", "SEN": "sn", "GHA": "gh", "TUN": "tn", "MAR": "ma", "URY": "uy", "ECU": "ec", "BOL": "bo", "PRY": "py", "GTM": "gt", "CRI": "cr", "PAN": "pa", "DOM": "do", "TWN": "tw", "MNG": "mn", "KAZ": "kz", "KGZ": "kg", "BTN": "bt", "BGD": "bd", "LKA": "lk", "KHM": "kh", "ALB": "al", "MNE": "me", "BIH": "ba", "MKD": "mk", "SVN": "si", "BEL": "be", "NLD": "nl", "DNK": "dk", "EST": "ee", "LVA": "lv", "LTU": "lt", "LUX": "lu", "SGP": "sg", "GRL": "gl", "CUB": "cu", "PRK": "kp" };
 
-        let map, geoData, currentTarget, unplayed, activeList, labelMarkers = [], polygons = {}, isLocked = false, scoreCount = 0;
+        let map, geoData, currentTarget, unplayed, activeList, labelMarkers = [], polygons = {}, scoreCount = 0;
 
         function initMap() {
             map = L.map('map-container', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 12, zoomControl: false });
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             
-            map.on('zoomend', updateLabelVisibility);
+            // Standard Topo Map (Reliable)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { 
+                attribution: 'Esri' 
+            }).addTo(map);
+            
+            map.on('zoomend', updateLabels);
 
             fetch("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
-                .then(r => r.json()).then(d => {
-                    geoData = d;
-                    document.getElementById("menu-buttons").classList.remove("opacity-50", "pointer-events-none");
-                    document.getElementById("db-status").innerText = "CONNECTED 🟢";
-                    document.getElementById("db-status").className = "text-[10px] font-bold mb-8 text-green-400 italic tracking-widest";
-                });
+                .then(r => r.json()).then(d => { geoData = d; });
         }
 
         function startGame(mode) {
             activeList = mode === 'duel' ? duelIDs : Object.keys(countryCodes);
             document.getElementById("main-menu-overlay").classList.add("hidden");
             document.getElementById("game-ui").classList.remove("hidden").classList.add("flex");
-            document.getElementById("current-mode-display").innerText = mode === 'duel' ? "DUEL" : "ALL";
+            document.getElementById("current-mode-display").innerText = mode.toUpperCase();
             
             unplayed = [...activeList];
             scoreCount = 0;
             document.getElementById("score").innerText = 0;
             
-            renderWorld();
+            renderGameLayer();
             startRound();
         }
 
-        function renderWorld() {
-            if (map.mainLayer) map.removeLayer(map.mainLayer);
+        function renderGameLayer() {
+            if (map.gameLayer) map.removeLayer(map.gameLayer);
             labelMarkers.forEach(m => map.removeLayer(m));
             labelMarkers = [];
 
-            map.mainLayer = L.geoJSON(geoData, {
-                style: (f) => ({
-                    fillColor: activeList.includes(f.id) ? '#94c973' : '#cbd5e1',
-                    fillOpacity: activeList.includes(f.id) ? 0.7 : 0.2,
-                    color: '#475569', weight: 1
-                }),
+            map.gameLayer = L.geoJSON(geoData, {
+                filter: f => activeList.includes(f.id),
+                style: { color: 'rgba(0,0,0,0.2)', weight: 1.5, fillColor: 'transparent', fillOpacity: 0.01 },
                 onEachFeature: (f, l) => {
                     polygons[f.id] = l;
                     l.on('click', () => handleGuess(f.id, l));
-                    
-                    if (activeList.includes(f.id)) {
-                        const m = L.marker(l.getBounds().getCenter(), {
-                            icon: L.divIcon({ className: 'map-label label-country', html: f.properties.name, iconSize: [120, 20] }),
-                            interactive: false
-                        });
-                        labelMarkers.push(m);
-                    }
+                    const m = L.marker(l.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'country-label', html: f.properties.name, iconSize: [120, 20] }),
+                        interactive: false
+                    });
+                    labelMarkers.push(m);
                 }
             }).addTo(map);
 
-            continentMarkers.forEach(c => {
+            continents.forEach(c => {
                 const m = L.marker(c.pos, {
-                    icon: L.divIcon({ className: 'map-label label-continent', html: c.name, iconSize: [200, 30] }),
+                    icon: L.divIcon({ className: 'country-label label-continent', html: c.name, iconSize: [200, 30] }),
                     interactive: false
                 });
                 labelMarkers.push(m);
             });
-            updateLabelVisibility();
+            updateLabels();
         }
 
-        function updateLabelVisibility() {
+        function updateLabels() {
             const z = map.getZoom();
             labelMarkers.forEach(m => {
                 const isCont = m.options.icon.options.className.includes('continent');
-                if (z <= 3) {
-                    isCont ? m.addTo(map) : map.removeLayer(m);
-                } else if (z > 3 && z <= 9) {
-                    !isCont ? m.addTo(map) : map.removeLayer(m);
-                } else {
-                    map.removeLayer(m);
-                }
+                if (z <= 3) { isCont ? m.addTo(map) : map.removeLayer(m); }
+                else if (z > 3 && z <= 9) { !isCont ? m.addTo(map) : map.removeLayer(m); }
+                else { map.removeLayer(m); }
             });
         }
 
         function startRound() {
-            isLocked = false;
-            document.getElementById("flag-loader").classList.remove("hidden");
             if (unplayed.length === 0) unplayed = [...activeList];
             currentTarget = unplayed.splice(Math.floor(Math.random() * unplayed.length), 1)[0];
             document.getElementById("flag-display").src = `https://flagcdn.com/w320/${countryCodes[currentTarget]}.png`;
         }
 
         function handleGuess(id, layer) {
-            if (isLocked || !activeList.includes(id)) return;
-            isLocked = true;
             if (id === currentTarget) {
                 scoreCount++;
                 document.getElementById("score").innerText = scoreCount;
-                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 1 });
-                setTimeout(startRound, 400);
+                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 0.4 });
+                startRound();
             } else {
-                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 1 });
-                polygons[currentTarget].setStyle({ fillColor: '#22c55e', fillOpacity: 1 });
-                setTimeout(() => location.reload(), 1500);
+                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 0.5 });
+                setTimeout(() => location.reload(), 1000);
             }
         }
 
