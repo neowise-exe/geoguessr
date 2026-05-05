@@ -4,154 +4,182 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FlagGuessr</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Your specific Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmVeROPkTPAQWP7Wp9rMCibRNDrVZdYN8",
+            authDomain: "flagguessrneo.firebaseapp.com",
+            projectId: "flagguessrneo",
+            storageBucket: "flagguessrneo.firebasestorage.app",
+            messagingSenderId: "272364816723",
+            appId: "1:272364816723:web:8989e40751291655eb39a6",
+            measurementId: "G-1DRQXSEEJZ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- GLOBAL FIREBASE FUNCTIONS ---
+        window.saveScore = async function() {
+            const username = document.getElementById("username-input").value.trim();
+            if (!username) return alert("Please enter a name!");
+            
+            const btn = document.getElementById("save-btn");
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            try {
+                await addDoc(collection(db, "leaderboard"), {
+                    name: username,
+                    score: window.score, // Reference the global score
+                    mode: window.currentMode,
+                    timestamp: new Date()
+                });
+                alert("Score saved!");
+                location.reload(); // Refresh to reset
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                btn.disabled = false;
+                btn.innerText = "Try Again";
+                alert("Make sure your Firestore rules are set to Test Mode!");
+            }
+        };
+
+        window.showLeaderboard = async function() {
+            document.getElementById("leaderboard-modal").classList.remove("hidden");
+            document.getElementById("leaderboard-modal").classList.add("flex");
+            const body = document.getElementById("leaderboard-body");
+            body.innerHTML = "<tr><td colspan='3' class='text-center py-4'>Loading...</td></tr>";
+
+            try {
+                const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
+                const querySnapshot = await getDocs(q);
+                body.innerHTML = "";
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    body.innerHTML += `
+                        <tr class="border-b border-slate-700">
+                            <td class="py-3 px-2 font-bold text-blue-400">${data.name}</td>
+                            <td class="py-3 px-2 text-right text-emerald-400 font-bold">${data.score}</td>
+                            <td class="py-3 px-2 text-right text-slate-500 text-xs uppercase">${data.mode}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                body.innerHTML = "<tr><td colspan='3' class='text-center text-red-400'>Error loading data.</td></tr>";
+            }
+        };
+
+        window.closeLeaderboard = function() {
+            document.getElementById("leaderboard-modal").classList.add("hidden");
+        };
+    </script>
+
     <style>
         body { margin: 0; overflow: hidden; background-color: #aad3df; }
-        
-        #map-container {
-            width: 100vw;
-            height: 100vh;
-            background-color: #aad3df; 
-            cursor: crosshair;
-        }
-
-        .country {
-            fill: #475569; 
-            stroke: #1e293b;
-            stroke-width: 0.2px;
-            transition: fill 0.15s ease;
-            outline: none;
-        }
-
+        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; cursor: crosshair; }
+        .country { fill: #475569; stroke: #1e293b; stroke-width: 0.2px; transition: fill 0.15s ease; outline: none; }
         .country:hover { fill: #fde047; }
         .correct-flash { fill: #22c55e !important; }
         .guessed-correctly { fill: #22c55e !important; opacity: 0.8; }
         .incorrect-flash { fill: #ef4444 !important; }
-
-        .country-label {
-            pointer-events: none;
-            user-select: none;
-            text-anchor: middle;
-            fill: #ffffff; 
-            font-family: 'Arial', sans-serif;
-            font-weight: 800; 
-            paint-order: stroke;
-            stroke: #000000;
-            stroke-width: 0.6px;
-            transition: opacity 0.2s ease;
-        }
-
-        .non-playable {
-            pointer-events: none;
-            fill: #000000 !important; 
-            stroke: #1e293b;
-        }
-        
+        .country-label { pointer-events: none; user-select: none; text-anchor: middle; fill: #ffffff; font-family: 'Arial', sans-serif; font-weight: 800; paint-order: stroke; stroke: #000000; stroke-width: 0.6px; transition: opacity 0.2s ease; }
+        .non-playable { pointer-events: none; fill: #000000 !important; stroke: #1e293b; }
+        .hidden-label { opacity: 0 !important; visibility: hidden; }
         .flag-loading { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-        .hidden-label { opacity: 0 !important; visibility: hidden; }
     </style>
 </head>
-<body class="text-white font-sans antialiased selection:bg-blue-500 selection:text-white">
+<body class="text-white font-sans antialiased">
 
+    <!-- UI Overlay -->
     <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 hidden items-center justify-between px-6 py-3">
         <div class="flex items-center gap-3">
-            <button onclick="showMainMenu()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition mr-2" title="Quit to Menu">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
             <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
                 <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Score</span>
-                <div class="flex items-baseline gap-1">
-                    <span id="score" class="text-2xl font-black text-blue-400">0</span>
-                    <span class="text-sm font-bold text-slate-500">/ <span id="total-countries">0</span></span>
-                </div>
-            </div>
-            <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
-                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Mode</span>
-                <span id="current-mode-display" class="text-sm font-bold text-amber-400 mt-1">Duel</span>
+                <span id="score" class="text-2xl font-black text-blue-400">0</span>
             </div>
         </div>
-
-        <div class="relative group">
-            <div class="h-20 w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden shadow-inner flex items-center justify-center">
-                <div id="flag-loader" class="text-slate-500 text-sm flag-loading hidden">Loading...</div>
-                <img id="flag-display" src="" alt="Guess this flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
-            </div>
+        <div class="h-20 w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden flex items-center justify-center">
+            <div id="flag-loader" class="text-slate-500 text-sm flag-loading hidden">Loading...</div>
+            <img id="flag-display" src="" alt="Flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
         </div>
-
-        <div class="text-right text-sm text-slate-400 hidden md:block">
-            <p>Scroll to <span class="text-slate-200 font-semibold">Zoom</span></p>
-            <p>Click & Drag to <span class="text-slate-200 font-semibold">Pan</span></p>
+        <div class="text-right text-sm text-slate-400">
+            <span id="current-mode-display" class="text-amber-400 font-bold uppercase">Duel</span>
         </div>
     </div>
 
     <div id="map-container"></div>
 
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-200">Loading Map Data...</h2>
-    </div>
-
-    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-40 hidden flex-col items-center justify-center">
+    <!-- Main Menu -->
+    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 z-40 flex flex-col items-center justify-center">
         <div class="bg-slate-800 p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-lg w-full mx-4">
-            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-1 pb-2 tracking-wide">FlagGuessr</h1>
-            <div class="text-xs text-slate-500 font-semibold mb-6 uppercase tracking-widest">By Neowise</div>
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-8">FlagGuessr</h1>
             <div class="space-y-4 mb-8">
-                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 flex flex-col items-center group">
-                    <span class="text-xl">Duel Practice</span>
-                    <span class="text-xs text-blue-200 font-normal mt-1 opacity-80 group-hover:opacity-100">Standard GeoGuessr Countries Only</span>
-                </button>
-                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 flex flex-col items-center group">
-                    <span class="text-xl">Arbitrary World</span>
-                    <span class="text-xs text-emerald-200 font-normal mt-1 opacity-80 group-hover:opacity-100">Includes obscure territories</span>
-                </button>
+                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition">Duel Practice</button>
+                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition">Arbitrary World</button>
             </div>
             <button onclick="showLeaderboard()" class="text-slate-300 hover:text-white font-semibold underline transition">View Leaderboard</button>
         </div>
     </div>
 
-    <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-40 hidden flex-col items-center justify-center">
+    <!-- Game Over Screen -->
+    <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-40 hidden flex-col items-center justify-center">
         <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 shadow-2xl text-center max-w-md w-full mx-4">
             <h1 class="text-4xl font-black text-red-500 mb-2">Incorrect!</h1>
-            <p class="text-slate-300 text-lg mb-6">That was <span id="correct-answer-name" class="font-bold text-blue-400 text-2xl block mt-2">Country Name</span></p>
-            <div class="mb-6">
-                <div class="text-sm text-slate-400 mb-1">Final Score</div>
-                <div id="final-score" class="text-5xl font-black text-white">0</div>
+            <p class="text-slate-300 mb-4">That was <span id="correct-answer-name" class="font-bold text-blue-400 block">Country</span></p>
+            
+            <div class="mb-6 bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                <div class="text-sm text-slate-400 mb-2">Save score: <span id="final-score" class="text-white font-bold">0</span></div>
+                <input type="text" id="username-input" maxlength="15" placeholder="Your Name" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 mb-3">
+                <button id="save-btn" onclick="saveScore()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg transition">Submit</button>
             </div>
+
             <div class="flex gap-3">
-                <button onclick="restartGame()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition">Play Again</button>
-                <button onclick="showMainMenu()" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-xl transition">Main Menu</button>
+                <button onclick="restartGame()" class="flex-1 bg-blue-600 py-3 rounded-xl font-bold">Try Again</button>
+                <button onclick="location.reload()" class="flex-1 bg-slate-600 py-3 rounded-xl font-bold">Menu</button>
             </div>
         </div>
     </div>
 
-    <script>
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        let audioCtx;
-        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
-        function playTone(freq, type, duration, vol, slideFreq = null) {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type; osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
-            osc.frequency.setValueAtTime(freq, now);
-            if (slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
-            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(vol, now + 0.05); gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
-            osc.start(now); osc.stop(now + duration);
-        }
-        function playCorrectSound() { initAudio(); playTone(523.25, 'sine', 0.15, 0.3); setTimeout(() => playTone(783.99, 'sine', 0.4, 0.3), 100); }
-        function playIncorrectSound() { initAudio(); playTone(250, 'triangle', 0.4, 0.5, 100); }
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-50 hidden flex-col items-center justify-center">
+        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black">Top Streaks</h2>
+                <button onclick="closeLeaderboard()" class="text-2xl">&times;</button>
+            </div>
+            <div class="overflow-y-auto">
+                <table class="w-full text-left">
+                    <tbody id="leaderboard-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <script>
+        // --- GAME LOGIC ---
         const duelCountries = { "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" }, "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" }, "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" }, "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" } };
         const arbitraryAdditions = { "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
         const arbitraryCountries = { ...duelCountries, ...arbitraryAdditions };
 
-        let activeDictionary = {}, availableCountries = [], unplayedCountries = [], currentTarget = "", score = 0, currentMode = "duel", isInputLocked = false, mapDataFeatures = [];
+        window.score = 0;
+        window.currentMode = "duel";
+        let activeDictionary = {}, availableCountries = [], unplayedCountries = [], currentTarget = "", isInputLocked = false, mapDataFeatures = [];
 
         const container = document.getElementById("map-container");
         let width = container.clientWidth, height = container.clientHeight;
@@ -160,95 +188,60 @@
         const projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
         const path = d3.geoPath().projection(projection);
 
-        const zoom = d3.zoom().scaleExtent([1, 60]).translateExtent([[-width, -height], [width * 2, height * 2]])
-            .on("zoom", (event) => {
-                const k = event.transform.k;
-                g.attr('transform', event.transform);
-                g.selectAll("path").attr("stroke-width", 0.2 / k);
-                
-                g.selectAll(".country-label")
-                    .style("font-size", Math.max(0.5, (10/k) + 0.8) + "px") // Keeps size consistent on screen
-                    .style("stroke-width", (0.5 / k) + "px")
-                    .each(function(d) {
-                        const node = d3.select(this);
-                        const bbox = path.bounds(d);
-                        const cWidth = (bbox[1][0] - bbox[0][0]) * k;
-                        const cHeight = (bbox[1][1] - bbox[0][1]) * k;
-                        const labelLen = this.getComputedTextLength() * k;
-                        
-                        let rotation = 0;
-                        if(d.id === "NOR" || d.id === "CHL" || d.id === "VNM") rotation = -65;
-                        if(d.id === "HRV") rotation = -20;
-                        if(d.id === "JPN") rotation = -45;
-
-                        node.attr("transform", `${getLabelTransform(d)} rotate(${rotation})`);
-
-                        const maxDim = Math.max(cWidth, cHeight);
-                        // Allow labels to be slightly bigger than the bounding box for readability
-                        if (k < 2.5 || labelLen > (maxDim * 1.2)) {
-                            node.classed("hidden-label", true);
-                        } else {
-                            node.classed("hidden-label", false);
-                        }
-                    });
-            });
+        const zoom = d3.zoom().scaleExtent([1, 60]).on("zoom", (event) => {
+            const k = event.transform.k;
+            g.attr('transform', event.transform);
+            g.selectAll("path").attr("stroke-width", 0.2 / k);
+            g.selectAll(".country-label").style("font-size", Math.max(0.5, (10/k) + 0.8) + "px").style("stroke-width", (0.4 / k) + "px")
+                .each(function(d) {
+                    const node = d3.select(this);
+                    const bbox = path.bounds(d);
+                    const cWidth = (bbox[1][0] - bbox[0][0]) * k;
+                    const cHeight = (bbox[1][1] - bbox[0][1]) * k;
+                    const labelLen = this.getComputedTextLength() * k;
+                    let rotation = 0;
+                    if(d.id === "NOR" || d.id === "CHL" || d.id === "VNM") rotation = -65;
+                    if(d.id === "HRV") rotation = -20;
+                    if(d.id === "JPN") rotation = -45;
+                    node.attr("transform", `${getLabelTransform(d)} rotate(${rotation})`);
+                    const maxDim = Math.max(cWidth, cHeight);
+                    if (k < 3.2 || labelLen > (maxDim * 1.2)) node.classed("hidden-label", true); else node.classed("hidden-label", false);
+                });
+        });
         svg.call(zoom);
 
         function getLabelTransform(d) {
-            const overrides = { 
-                "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "FRA": [2.2, 46.2], 
-                "GBR": [-3.4, 55.3], "RUS": [90.0, 60.0], "ZAF": [25.0, -29.0], 
-                "CHL": [-71.5, -30.6], "IDN": [114.0, -1.0], "BGR": [25.5, 42.7],
-                "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5],
-                "ITA": [12.6, 42.5], "GRC": [22.2, 39.2], "PHL": [121.5, 13.0]
-            };
+            const overrides = { "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "FRA": [2.2, 46.2], "GBR": [-3.4, 55.3], "RUS": [90.0, 60.0], "ZAF": [25.0, -29.0], "CHL": [-71.5, -30.6], "IDN": [114.0, -1.0], "BGR": [25.5, 42.7], "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5], "ITA": [12.6, 42.5], "GRC": [22.2, 39.2], "PHL": [121.5, 13.0] };
             if (overrides[d.id]) { const proj = projection(overrides[d.id]); return `translate(${proj[0]}, ${proj[1]})`; }
             const centroid = path.centroid(d);
             return !isNaN(centroid[0]) ? `translate(${centroid})` : "translate(-1000,-1000)";
         }
 
-        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(data) {
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
             mapDataFeatures = data.features;
             document.getElementById("loading-overlay").style.display = "none";
-            renderMap({}); 
-            document.getElementById("main-menu-overlay").classList.remove("hidden");
-            document.getElementById("main-menu-overlay").classList.add("flex");
+            renderMap({});
         });
 
-        function renderMap(dictionary) {
-            g.selectAll("*").remove(); 
+        function renderMap(dict) {
+            g.selectAll("*").remove();
             const mapCountryIDs = mapDataFeatures.map(f => f.id);
-            availableCountries = Object.keys(dictionary).filter(id => mapCountryIDs.includes(id));
-
-            g.selectAll("path")
-                .data(mapDataFeatures)
-                .join("path")
+            availableCountries = Object.keys(dict).filter(id => mapCountryIDs.includes(id));
+            g.selectAll("path").data(mapDataFeatures).join("path")
                 .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable country")
-                .attr("d", path)
-                .attr("id", d => "country-" + d.id)
-                .on("click", handleCountryClick);
-
-            g.selectAll(".country-label")
-                .data(mapDataFeatures.filter(d => availableCountries.includes(d.id)))
-                .join("text")
-                .attr("class", "country-label hidden-label")
-                .attr("id", d => "label-" + d.id) 
-                .attr("transform", d => getLabelTransform(d))
-                .text(d => dictionary[d.id].name);
+                .attr("d", path).attr("id", d => "country-" + d.id).on("click", handleCountryClick);
+            g.selectAll(".country-label").data(mapDataFeatures.filter(d => availableCountries.includes(d.id))).join("text")
+                .attr("class", "country-label hidden-label").attr("id", d => "label-" + d.id).attr("transform", d => getLabelTransform(d)).text(d => dict[d.id].name);
         }
 
         function startGame(mode) {
-            initAudio();
-            currentMode = mode;
+            window.currentMode = mode;
             activeDictionary = mode === 'duel' ? duelCountries : arbitraryCountries;
-            document.getElementById("current-mode-display").innerText = mode === 'duel' ? "Duel" : "Arbitrary";
+            document.getElementById("current-mode-display").innerText = mode;
             document.getElementById("main-menu-overlay").classList.add("hidden");
             document.getElementById("game-ui").classList.remove("hidden");
-            document.getElementById("game-ui").classList.add("flex");
-            score = 0; document.getElementById("score").innerText = score;
-            svg.call(zoom.transform, d3.zoomIdentity);
-            renderMap(activeDictionary); 
-            document.getElementById("total-countries").innerText = availableCountries.length;
+            window.score = 0; document.getElementById("score").innerText = 0;
+            renderMap(activeDictionary);
             unplayedCountries = [...availableCountries];
             startRound();
         }
@@ -259,23 +252,17 @@
             const randomIndex = Math.floor(Math.random() * unplayedCountries.length);
             currentTarget = unplayedCountries[randomIndex];
             unplayedCountries.splice(randomIndex, 1);
-            const flagData = activeDictionary[currentTarget];
-            const flagImg = document.getElementById("flag-display");
-            flagImg.classList.add("hidden");
-            document.getElementById("flag-loader").classList.remove("hidden");
-            flagImg.src = `https://flagcdn.com/w320/${flagData.code2}.png`;
+            document.getElementById("flag-display").src = `https://flagcdn.com/w320/${activeDictionary[currentTarget].code2}.png`;
         }
 
         function handleCountryClick(event, d) {
             if (isInputLocked || !availableCountries.includes(d.id)) return;
             isInputLocked = true;
             if (d.id === currentTarget) {
-                playCorrectSound();
-                score++; document.getElementById("score").innerText = score;
+                window.score++; document.getElementById("score").innerText = window.score;
                 d3.select(this).classed("guessed-correctly", true);
                 setTimeout(startRound, 400);
             } else {
-                playIncorrectSound();
                 d3.select(this).classed("incorrect-flash", true);
                 d3.select("#country-" + currentTarget).classed("correct-flash", true);
                 setTimeout(showGameOver, 600);
@@ -283,7 +270,7 @@
         }
 
         function showGameOver() {
-            document.getElementById("final-score").innerText = score;
+            document.getElementById("final-score").innerText = window.score;
             document.getElementById("correct-answer-name").innerText = activeDictionary[currentTarget].name;
             document.getElementById("game-over-overlay").classList.remove("hidden");
             document.getElementById("game-over-overlay").classList.add("flex");
@@ -292,14 +279,10 @@
         function restartGame() {
             document.getElementById("game-over-overlay").classList.add("hidden");
             renderMap(activeDictionary);
-            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
-            score = 0; document.getElementById("score").innerText = score;
+            window.score = 0; document.getElementById("score").innerText = 0;
             unplayedCountries = [...availableCountries];
             startRound();
         }
-
-        function showMainMenu() { location.reload(); }
-        function showLeaderboard() { alert("Leaderboard feature requires a database connection!"); }
     </script>
 </body>
 </html>
