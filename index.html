@@ -24,12 +24,11 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        window.saveScore = async function() {
-            const username = document.getElementById("username-input").value.trim();
+        window.saveScore = async function(isWin = false) {
+            const inputId = isWin ? "win-username-input" : "username-input";
+            const username = document.getElementById(inputId).value.trim();
             if (!username) return alert("Please enter a name!");
-            const btn = document.getElementById("save-btn");
-            btn.disabled = true;
-            btn.innerText = "Checking...";
+            
             try {
                 const q = query(collection(db, "leaderboard"), where("name", "==", username));
                 const querySnapshot = await getDocs(q);
@@ -47,13 +46,10 @@
                     await setDoc(doc(db, "leaderboard", docId), {
                         name: username, score: window.score, mode: window.currentMode, timestamp: new Date()
                     }, { merge: true });
-                    alert("High score logged!");
+                    alert("Record logged!");
                 }
                 location.reload();
-            } catch (e) {
-                btn.disabled = false;
-                btn.innerText = "Try Again";
-            }
+            } catch (e) { alert("Error saving score."); }
         };
 
         window.showLeaderboard = async function() {
@@ -80,44 +76,39 @@
         .country { fill: #475569; stroke: #1e293b; stroke-width: 0.2px; outline: none; transition: fill 0.1s; }
         .country:hover { fill: #fde047; }
         .non-playable { fill: #000000 !important; pointer-events: none !important; stroke: #334155; }
-        .correct-flash { fill: #22c55e !important; }
         .guessed-correctly { fill: #22c55e !important; opacity: 1 !important; }
         .incorrect-flash { fill: #ef4444 !important; }
+        .correct-flash { fill: #22c55e !important; }
         .country-label { pointer-events: none; user-select: none; text-anchor: middle; fill: #ffffff; font-family: sans-serif; font-weight: 800; paint-order: stroke; stroke: #000000; stroke-width: 0.6px; transition: opacity 0.2s ease; }
         .hidden-label { opacity: 0 !important; visibility: hidden; }
         
-        /* DESKTOP UI */
+        /* Layout Fixes */
         #game-ui { display: none; }
         @media (min-width: 769px) {
             #game-ui { display: flex; flex-direction: row; justify-content: space-between; }
-            #nav-controls { order: 1; width: 33.333%; justify-content: flex-start; }
-            #flag-container { order: 2; width: 33.333%; display: flex; justify-content: center; }
-            #instructions { order: 3; width: 33.333%; }
+            #nav-controls { order: 1; width: 33%; justify-content: flex-start; }
+            #flag-container { order: 2; width: 33%; display: flex; justify-content: center; }
+            #instructions { order: 3; width: 33%; }
         }
-
-        /* MOBILE UI */
         @media (max-width: 768px) {
-            #game-ui { 
-                display: flex;
-                padding: 0.4rem; 
-                flex-direction: row-reverse !important; 
-                justify-content: space-between !important;
-            }
-            #nav-controls { order: 2; width: auto; justify-content: flex-start; }
+            #game-ui { display: flex; padding: 0.4rem; flex-direction: row-reverse; justify-content: space-between; }
+            #nav-controls { order: 2; width: auto; }
             #flag-container { order: 1; width: auto; }
             .ui-box { min-width: fit-content !important; padding: 0.25rem 0.6rem !important; }
-            .ui-text-main { font-size: 0.8rem !important; white-space: nowrap; }
+            .ui-text-main { font-size: 0.8rem !important; }
             .flag-box { height: 3.2rem !important; width: 5.5rem !important; }
             #instructions { display: none; }
         }
+
+        /* Celebration Effects */
+        .confetti { position: absolute; pointer-events: none; animation: fall linear forwards; }
+        @keyframes fall { to { transform: translateY(100vh) rotate(360deg); } }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
 
     <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 items-center px-2 md:px-6 py-2">
-        
-        <!-- Controls (Left on Desktop, Left on Mobile) -->
-        <div id="nav-controls" class="flex items-center gap-2 md:gap-3">
+        <div id="nav-controls" class="flex items-center gap-2">
             <button onclick="location.reload()" class="bg-slate-700 p-2 rounded-lg text-white hover:bg-slate-600 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
@@ -125,15 +116,11 @@
                 <span id="score-display" class="ui-text-main text-sm md:text-base font-black text-blue-400 uppercase">STREAK: 0/0</span>
             </div>
         </div>
-
-        <!-- Flag (Center on Desktop, Right on Mobile) -->
         <div id="flag-container">
             <div class="flag-box h-12 md:h-16 w-20 md:w-28 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-xl">
                 <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden')">
             </div>
         </div>
-
-        <!-- Instructions (Desktop Only) -->
         <div id="instructions" class="text-right text-[9px] text-slate-400 uppercase font-bold tracking-tighter">
             <p>Scroll: <span class="text-slate-200">Zoom</span></p>
             <p>Drag: <span class="text-slate-200">Pan</span></p>
@@ -142,18 +129,32 @@
 
     <div id="map-container"></div>
 
-    <!-- Menus -->
+    <!-- Celebration Screen -->
+    <div id="win-overlay" class="fixed inset-0 bg-slate-900/95 z-50 hidden flex-col items-center justify-center p-6 text-center">
+        <div class="bg-slate-800 p-10 rounded-3xl border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.4)] max-w-lg w-full">
+            <h1 class="text-6xl font-black text-emerald-400 mb-4 animate-bounce">VICTORY!</h1>
+            <p class="text-slate-300 text-xl mb-8 font-bold">You've mastered the <span id="win-mode-name" class="text-blue-400"></span> world!</p>
+            <div class="mb-8 p-4 bg-slate-900 rounded-2xl">
+                <p class="text-slate-500 text-sm mb-2 uppercase">Perfect Streak</p>
+                <p id="win-score" class="text-5xl font-black text-white">0</p>
+            </div>
+            <input type="text" id="win-username-input" placeholder="ENTER NAME" class="w-full p-4 bg-slate-700 border-2 border-slate-600 rounded-xl mb-4 text-center font-bold text-white focus:border-emerald-500 outline-none">
+            <button onclick="saveScore(true)" class="w-full bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-black text-xl mb-4 transition">SAVE LEGACY</button>
+            <button onclick="location.reload()" class="text-slate-400 hover:text-white underline">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Menus (Menu, Game Over, etc.) -->
     <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center p-6 text-center">
         <div class="flex flex-col items-center mb-12">
             <h1 class="text-7xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-emerald-400 py-4 tracking-tighter">FlagGuessr</h1>
-            <p class="text-slate-500 font-bold tracking-[0.4em] uppercase text-[10px] md:text-xs">Made by Neowise</p>
+            <p class="text-slate-500 font-bold tracking-[0.4em] uppercase text-xs">Made by Neowise</p>
         </div>
-        
-        <div class="flex flex-col gap-6 w-full max-w-xs md:max-w-sm">
-            <button onclick="startGame('duel')" class="bg-blue-600 hover:bg-blue-500 p-5 rounded-2xl font-black text-2xl shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:-translate-y-1 active:scale-95">DUEL PRACTICE</button>
-            <button onclick="startGame('arbitrary')" class="bg-emerald-600 hover:bg-emerald-500 p-5 rounded-2xl font-black text-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:-translate-y-1 active:scale-95">ARBITRARY WORLD</button>
+        <div class="flex flex-col gap-6 w-full max-w-xs">
+            <button onclick="startGame('duel')" class="bg-blue-600 hover:bg-blue-500 p-5 rounded-2xl font-black text-2xl shadow-xl transition active:scale-95">DUEL PRACTICE</button>
+            <button onclick="startGame('arbitrary')" class="bg-emerald-600 hover:bg-emerald-500 p-5 rounded-2xl font-black text-2xl shadow-xl transition active:scale-95">ARBITRARY WORLD</button>
         </div>
-        <button onclick="showLeaderboard()" class="mt-14 text-slate-400 hover:text-white font-bold uppercase tracking-widest text-sm transition-colors">View Leaderboard</button>
+        <button onclick="showLeaderboard()" class="mt-14 text-slate-400 hover:text-white font-bold uppercase tracking-widest text-sm underline underline-offset-8 transition">View Leaderboard</button>
     </div>
 
     <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-40 hidden flex-col items-center justify-center p-4">
@@ -161,14 +162,14 @@
             <h2 class="text-3xl font-black text-red-500 mb-2">WRONG!</h2>
             <p class="text-slate-400 mb-6 font-medium">It was <span id="correct-answer-name" class="text-blue-400 font-black text-xl block"></span></p>
             <input type="text" id="username-input" placeholder="ENTER NAME" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl mb-4 text-center font-bold text-white focus:border-blue-500 outline-none">
-            <button id="save-btn" onclick="saveScore()" class="w-full bg-emerald-600 p-3 rounded-xl font-black mb-4 hover:bg-emerald-500 transition-colors">SUBMIT SCORE</button>
-            <button onclick="restartGame()" class="w-full bg-slate-700 p-3 rounded-xl font-black hover:bg-slate-600 transition-colors">TRY AGAIN</button>
+            <button id="save-btn" onclick="saveScore(false)" class="w-full bg-emerald-600 p-3 rounded-xl font-black mb-4">SUBMIT SCORE</button>
+            <button onclick="location.reload()" class="w-full bg-slate-700 p-3 rounded-xl font-black">EXIT</button>
         </div>
     </div>
 
     <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900 z-50 hidden flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-6 rounded-3xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col border border-slate-700">
-            <div class="flex justify-between items-center mb-6"><h3 class="font-black text-2xl tracking-tight">LEADERBOARD</h3><button onclick="closeLeaderboard()" class="text-2xl font-black hover:text-red-500 transition">✕</button></div>
+        <div class="bg-slate-800 p-6 rounded-3xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-6"><h3 class="font-black text-2xl tracking-tight">LEADERBOARD</h3><button onclick="closeLeaderboard()" class="text-2xl font-black">✕</button></div>
             <div class="overflow-y-auto pr-2"><table class="w-full text-left"><tbody id="leaderboard-body"></tbody></table></div>
         </div>
     </div>
@@ -178,8 +179,45 @@
     </div>
 
     <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+        
+        function playTone(freq, type, duration, vol, slideFreq = null) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            osc.frequency.setValueAtTime(freq, now);
+            if (slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(vol, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+            osc.start(now); osc.stop(now + duration);
+        }
+
+        const playCorrectSound = () => { initAudio(); playTone(523.25, 'sine', 0.15, 0.3); setTimeout(() => playTone(783.99, 'sine', 0.4, 0.3), 100); };
+        const playIncorrectSound = () => { initAudio(); playTone(250, 'triangle', 0.4, 0.5, 100); };
+        const playWinSound = () => { initAudio(); playTone(523, 'sine', 0.2, 0.3); setTimeout(()=>playTone(659, 'sine', 0.2, 0.3),150); setTimeout(()=>playTone(783, 'sine', 0.5, 0.3),300); };
+
+        const createConfetti = () => {
+            for(let i=0; i<100; i++){
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = ['#10b981','#3b82f6','#facc15','#ef4444'][Math.floor(Math.random()*4)];
+                c.style.width = Math.random() * 10 + 5 + 'px';
+                c.style.height = c.style.width;
+                c.style.top = '-10px';
+                c.style.animationDuration = Math.random() * 3 + 2 + 's';
+                document.body.appendChild(c);
+                setTimeout(() => c.remove(), 5000);
+            }
+        };
+
         const duelCountries = { "AND": { code2: "ad", name: "Andorra" }, "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" }, "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" }, "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" }, "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" } };
-        const arbitraryAdditions = { "LUX": { code2: "lu", name: "Luxembourg" }, "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
+        const arbitraryAdditions = { "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
         const arbitraryCountries = { ...duelCountries, ...arbitraryAdditions };
 
         window.score = 0;
@@ -194,9 +232,7 @@
         const projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
         const path = d3.geoPath().projection(projection);
 
-        const zoom = d3.zoom()
-            .scaleExtent([1, 60])
-            .translateExtent([[-width/2, -height/4], [width*1.5, height*1.2]])
+        const zoom = d3.zoom().scaleExtent([1, 60]).translateExtent([[-width/2, -height/4], [width*1.5, height*1.2]])
             .on("zoom", (event) => {
                 const k = event.transform.k;
                 g.attr('transform', event.transform);
@@ -211,10 +247,8 @@
                         if(["NOR", "CHL", "VNM"].includes(d.id)) rotation = -65;
                         if(d.id === "JPN") rotation = -45;
                         node.attr("transform", `${getLabelTransform(d)} rotate(${rotation})`);
-                        
                         const isSmall = ["LUX", "AND", "BIH", "MKD", "MNE", "SVN"].includes(d.id);
                         const threshold = isSmall ? 2.5 : 1.4;
-
                         if (k < 3.2 || labelLen > (Math.max((bbox[1][0]-bbox[0][0]), (bbox[1][1]-bbox[0][1])) * k * threshold)) 
                             node.classed("hidden-label", true); else node.classed("hidden-label", false);
                     });
@@ -242,14 +276,13 @@
             g.selectAll("path").data(mapDataFeatures).join("path")
                 .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable")
                 .attr("d", path).attr("id", d => "country-" + d.id)
-                .on("click", (event, d) => {
-                    if (availableCountries.includes(d.id)) handleCountryClick(event, d);
-                });
+                .on("click", (event, d) => { if (availableCountries.includes(d.id)) handleCountryClick(event, d); });
             g.selectAll(".country-label").data(mapDataFeatures.filter(d => availableCountries.includes(d.id))).join("text")
                 .attr("class", "country-label hidden-label").attr("id", d => "label-" + d.id).attr("transform", d => getLabelTransform(d)).text(d => dict[d.id].name);
         }
 
         function startGame(mode) {
+            initAudio();
             window.currentMode = mode;
             activeDictionary = (mode === 'duel') ? duelCountries : arbitraryCountries;
             document.getElementById("main-menu-overlay").classList.add("hidden");
@@ -264,7 +297,10 @@
 
         function startRound() {
             isInputLocked = false;
-            if (unplayedCountries.length === 0) unplayedCountries = [...availableCountries];
+            if (unplayedCountries.length === 0) {
+                showWinScreen();
+                return;
+            }
             const randomIndex = Math.floor(Math.random() * unplayedCountries.length);
             currentTarget = unplayedCountries[randomIndex];
             unplayedCountries.splice(randomIndex, 1);
@@ -276,11 +312,13 @@
             if (d3.select("#country-" + d.id).classed("guessed-correctly")) return;
             isInputLocked = true;
             if (d.id === currentTarget) {
+                playCorrectSound();
                 window.score++; 
                 document.getElementById("score-display").innerText = `STREAK: ${window.score}/${availableCountries.length}`;
                 d3.select("#country-" + d.id).classed("guessed-correctly", true);
-                setTimeout(() => { startRound(); }, 400);
+                setTimeout(startRound, 400);
             } else {
+                playIncorrectSound();
                 d3.select("#country-" + d.id).classed("incorrect-flash", true);
                 d3.select("#country-" + currentTarget).classed("correct-flash", true);
                 setTimeout(showGameOver, 600);
@@ -291,6 +329,15 @@
             document.getElementById("correct-answer-name").innerText = activeDictionary[currentTarget].name;
             document.getElementById("game-over-overlay").classList.remove("hidden");
             document.getElementById("game-over-overlay").classList.add("flex");
+        }
+
+        function showWinScreen() {
+            playWinSound();
+            createConfetti();
+            document.getElementById("win-mode-name").innerText = window.currentMode.toUpperCase();
+            document.getElementById("win-score").innerText = window.score;
+            document.getElementById("win-overlay").classList.remove("hidden");
+            document.getElementById("win-overlay").classList.add("flex");
         }
 
         function restartGame() { location.reload(); }
