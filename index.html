@@ -4,44 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GeoGuessr Flag Trainer</title>
-    <!-- Tailwind CSS for rapid, modern styling -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- D3.js for SVG Map Rendering and Zoom/Pan -->
+    <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        /* Custom map styles */
         body { margin: 0; overflow: hidden; background-color: #0f172a; }
         
         #map-container {
             width: 100vw;
             height: 100vh;
-            background-color: #1e293b; /* Ocean color */
+            background-color: #1e293b;
             cursor: crosshair;
         }
 
         .country {
-            fill: #334155; /* Land color */
-            stroke: #0f172a; /* Border color */
+            fill: #334155; 
+            stroke: #0f172a;
             stroke-width: 0.5px;
             transition: fill 0.15s ease;
             outline: none;
         }
 
-        .country:hover {
-            fill: #60a5fa; /* Hover highlight color */
-        }
-
-        .correct-flash {
-            fill: #22c55e !important; /* Green correct flash */
-        }
-        
-        .guessed-correctly {
-            fill: #22c55e !important; /* Keep green */
-        }
-
-        .incorrect-flash {
-            fill: #ef4444 !important; /* Red incorrect flash */
-        }
+        .country:hover { fill: #60a5fa; }
+        .correct-flash { fill: #22c55e !important; }
+        .guessed-correctly { fill: #22c55e !important; }
+        .incorrect-flash { fill: #ef4444 !important; }
 
         .country-label {
             pointer-events: none;
@@ -54,52 +42,50 @@
             text-shadow: 0px 0px 1px rgba(15, 23, 42, 0.8);
         }
 
-        /* Hide map elements that aren't in our playable list */
         .non-playable {
             pointer-events: none;
             fill: #1e293b; 
             stroke: #334155;
         }
         
-        .flag-loading {
-            animation: pulse 1.5s infinite;
-        }
-
+        .flag-loading { animation: pulse 1.5s infinite; }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        /* Custom Scrollbar for Leaderboard */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     </style>
 </head>
 <body class="text-white font-sans antialiased selection:bg-blue-500 selection:text-white">
 
-    <!-- Top Navigation Bar -->
-    <div class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 flex items-center justify-between px-6 py-3">
-        <!-- Streak Counter -->
+    <!-- Top Navigation Bar (Hidden on Main Menu) -->
+    <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 hidden items-center justify-between px-6 py-3">
         <div class="flex items-center gap-3">
+            <button onclick="showMainMenu()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition mr-2" title="Quit to Menu">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </button>
             <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
                 <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Streak</span>
                 <span id="score" class="text-2xl font-black text-blue-400">0</span>
             </div>
             <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
-                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">High Score</span>
-                <span id="high-score" class="text-2xl font-black text-amber-400">0</span>
+                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Mode</span>
+                <span id="current-mode-display" class="text-sm font-bold text-amber-400 mt-1">Duel</span>
             </div>
         </div>
 
-        <!-- Target Flag -->
         <div class="relative group">
             <div class="h-20 w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden shadow-inner flex items-center justify-center">
                 <div id="flag-loader" class="text-slate-500 text-sm flag-loading hidden">Loading...</div>
                 <img id="flag-display" src="" alt="Guess this flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
             </div>
-            <!-- Tooltip info -->
-            <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                Identify this flag
-            </div>
         </div>
 
-        <!-- Controls Info -->
         <div class="text-right text-sm text-slate-400 hidden md:block">
             <p>Scroll to <span class="text-slate-200 font-semibold">Zoom</span></p>
             <p>Click & Drag to <span class="text-slate-200 font-semibold">Pan</span></p>
@@ -112,122 +98,163 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center">
         <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-200">Generating World Map...</h2>
+        <h2 class="text-xl font-bold text-slate-200">Loading Map Data...</h2>
+    </div>
+
+    <!-- Main Menu Overlay -->
+    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-40 hidden flex-col items-center justify-center">
+        <div class="bg-slate-800 p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-lg w-full mx-4">
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">FlagMaster</h1>
+            <p class="text-slate-400 mb-8">Select your practice mode</p>
+            
+            <div class="space-y-4 mb-8">
+                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 flex flex-col items-center group">
+                    <span class="text-xl">Duel Practice</span>
+                    <span class="text-xs text-blue-200 font-normal mt-1 opacity-80 group-hover:opacity-100">Standard GeoGuessr Countries Only</span>
+                </button>
+                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 flex flex-col items-center group">
+                    <span class="text-xl">Arbitrary World</span>
+                    <span class="text-xs text-emerald-200 font-normal mt-1 opacity-80 group-hover:opacity-100">Includes obscure territories and islands</span>
+                </button>
+            </div>
+
+            <button onclick="showLeaderboard()" class="text-slate-300 hover:text-white font-semibold underline decoration-slate-500 hover:decoration-white transition">
+                View Leaderboard
+            </button>
+        </div>
     </div>
 
     <!-- Game Over Overlay -->
     <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-40 hidden flex-col items-center justify-center">
         <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 shadow-2xl text-center max-w-md w-full mx-4">
-            <div class="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </div>
-            <h1 class="text-4xl font-black text-white mb-2">Incorrect!</h1>
+            <h1 class="text-4xl font-black text-red-500 mb-2">Incorrect!</h1>
             <p class="text-slate-300 text-lg mb-6">
                 That was <span id="correct-answer-name" class="font-bold text-blue-400 text-2xl block mt-2">Country Name</span>
             </p>
             
-            <div class="flex justify-center gap-4 mb-8">
-                <div class="text-center">
-                    <div class="text-sm text-slate-400 mb-1">Final Streak</div>
-                    <div id="final-score" class="text-3xl font-bold text-white">0</div>
-                </div>
+            <div class="mb-6">
+                <div class="text-sm text-slate-400 mb-1">Final Streak</div>
+                <div id="final-score" class="text-5xl font-black text-white">0</div>
             </div>
 
-            <button onclick="restartGame()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 transform hover:scale-[1.02] active:scale-95 shadow-lg flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Play Again
-            </button>
+            <!-- Leaderboard Submission Form -->
+            <div id="score-submit-section" class="bg-slate-700/50 p-4 rounded-xl mb-6">
+                <p class="text-sm text-slate-300 mb-2 font-semibold">Save your score to the leaderboard!</p>
+                <div class="flex gap-2">
+                    <input type="text" id="player-name" placeholder="Enter your name..." maxlength="15" class="flex-1 bg-slate-900 border border-slate-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500">
+                    <button onclick="saveScore()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2 rounded-lg transition">Save</button>
+                </div>
+                <p id="save-msg" class="text-green-400 text-xs font-bold mt-2 hidden">Score Saved!</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="restartGame()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition">Play Again</button>
+                <button onclick="showMainMenu()" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-xl transition">Main Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 hidden flex-col items-center justify-center">
+        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 shadow-2xl max-w-lg w-full mx-4 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-black text-white">Top Streaks</h2>
+                <button onclick="closeLeaderboard()" class="text-slate-400 hover:text-white">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto pr-2 flex-1">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-slate-400 text-sm border-b border-slate-700">
+                            <th class="pb-2 font-semibold">Rank</th>
+                            <th class="pb-2 font-semibold">Name</th>
+                            <th class="pb-2 font-semibold text-center">Mode</th>
+                            <th class="pb-2 font-semibold text-right">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body" class="text-lg">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script>
-        // Extensive list of typical GeoGuessr countries and territories
-        // Mapping Alpha-3 map codes to Alpha-2 flag codes
-        const geoGuessrCountries = {
-            "USA": { code2: "us", name: "United States" },
-            "CAN": { code2: "ca", name: "Canada" },
-            "MEX": { code2: "mx", name: "Mexico" },
-            "BRA": { code2: "br", name: "Brazil" },
-            "ARG": { code2: "ar", name: "Argentina" },
-            "COL": { code2: "co", name: "Colombia" },
-            "PER": { code2: "pe", name: "Peru" },
-            "CHL": { code2: "cl", name: "Chile" },
-            "GBR": { code2: "gb", name: "United Kingdom" },
-            "FRA": { code2: "fr", name: "France" },
-            "DEU": { code2: "de", name: "Germany" },
-            "ITA": { code2: "it", name: "Italy" },
-            "ESP": { code2: "es", name: "Spain" },
-            "SWE": { code2: "se", name: "Sweden" },
-            "NOR": { code2: "no", name: "Norway" },
-            "FIN": { code2: "fi", name: "Finland" },
-            "POL": { code2: "pl", name: "Poland" },
-            "RUS": { code2: "ru", name: "Russia" },
-            "ZAF": { code2: "za", name: "South Africa" },
-            "KEN": { code2: "ke", name: "Kenya" },
-            "NGA": { code2: "ng", name: "Nigeria" },
-            "AUS": { code2: "au", name: "Australia" },
-            "NZL": { code2: "nz", name: "New Zealand" },
-            "JPN": { code2: "jp", name: "Japan" },
-            "KOR": { code2: "kr", name: "South Korea" },
-            "IND": { code2: "in", name: "India" },
-            "IDN": { code2: "id", name: "Indonesia" },
-            "THA": { code2: "th", name: "Thailand" },
-            "MYS": { code2: "my", name: "Malaysia" },
-            "PHL": { code2: "ph", name: "Philippines" },
-            "VNM": { code2: "vn", name: "Vietnam" },
-            "TUR": { code2: "tr", name: "Turkey" },
-            "EGY": { code2: "eg", name: "Egypt" },
-            "GRL": { code2: "gl", name: "Greenland" },
-            "ISL": { code2: "is", name: "Iceland" },
-            "IRL": { code2: "ie", name: "Ireland" },
-            "PRT": { code2: "pt", name: "Portugal" },
-            "CHE": { code2: "ch", name: "Switzerland" },
-            "AUT": { code2: "at", name: "Austria" },
-            "CZE": { code2: "cz", name: "Czechia" },
-            "SVK": { code2: "sk", name: "Slovakia" },
-            "HUN": { code2: "hu", name: "Hungary" },
-            "ROU": { code2: "ro", name: "Romania" },
-            "BGR": { code2: "bg", name: "Bulgaria" },
-            "GRC": { code2: "gr", name: "Greece" },
-            "HRV": { code2: "hr", name: "Croatia" },
-            "SRB": { code2: "rs", name: "Serbia" },
-            "UKR": { code2: "ua", name: "Ukraine" },
-            "ARE": { code2: "ae", name: "United Arab Emirates" },
-            "ISR": { code2: "il", name: "Israel" },
-            "SAU": { code2: "sa", name: "Saudi Arabia" },
-            "BWA": { code2: "bw", name: "Botswana" },
-            "SEN": { code2: "sn", name: "Senegal" },
-            "GHA": { code2: "gh", name: "Ghana" },
-            "TUN": { code2: "tn", name: "Tunisia" },
-            "MAR": { code2: "ma", name: "Morocco" },
-            "URY": { code2: "uy", name: "Uruguay" },
-            "ECU": { code2: "ec", name: "Ecuador" },
-            "BOL": { code2: "bo", name: "Bolivia" },
-            "PRY": { code2: "py", name: "Paraguay" },
-            "GTM": { code2: "gt", name: "Guatemala" },
-            "CRI": { code2: "cr", name: "Costa Rica" },
-            "PAN": { code2: "pa", name: "Panama" },
-            "DOM": { code2: "do", name: "Dominican Republic" },
-            "TWN": { code2: "tw", name: "Taiwan" },
-            "MNG": { code2: "mn", name: "Mongolia" },
-            "KAZ": { code2: "kz", name: "Kazakhstan" },
-            "KGZ": { code2: "kg", name: "Kyrgyzstan" },
-            "BTN": { code2: "bt", name: "Bhutan" },
-            "BGD": { code2: "bd", name: "Bangladesh" },
-            "LKA": { code2: "lk", name: "Sri Lanka" },
+        // 1. Duel Mode Countries (Standard 70)
+        const duelCountries = {
+            "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" },
+            "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" },
+            "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" },
+            "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" },
+            "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" },
+            "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" },
+            "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" },
+            "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" },
+            "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" },
+            "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" },
+            "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" },
+            "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" },
+            "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" },
+            "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" },
+            "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" },
+            "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" },
+            "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" },
+            "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" },
+            "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" },
+            "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" },
+            "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" },
+            "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" },
+            "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" },
+            "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" },
+            "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" },
+            "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" },
+            "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" },
+            "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" },
+            "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" },
+            "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" },
+            "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" },
+            "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" },
+            "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" },
+            "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" },
+            "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" },
             "KHM": { code2: "kh", name: "Cambodia" }
         };
 
-        // Game State
-        let availableCountries = []; // Will be populated based on what the map actually renders
+        // 2. Arbitrary Additions (Islands, territories, obscure flags)
+        const arbitraryAdditions = {
+            "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" },
+            "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" },
+            "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" },
+            "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" },
+            "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" },
+            "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" },
+            "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" },
+            "MDG": { code2: "mg", name: "Madagascar" }, "CUB": { code2: "cu", name: "Cuba" },
+            "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" },
+            "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" },
+            "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" },
+            "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" },
+            "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" },
+            "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" },
+            "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" }
+        };
+
+        // Combine for Arbitrary Mode
+        const arbitraryCountries = { ...duelCountries, ...arbitraryAdditions };
+
+        // Game State Variables
+        let activeDictionary = {};
+        let availableCountries = []; 
         let currentTarget = "";
         let score = 0;
-        let highScore = parseInt(localStorage.getItem("flagGuesserHighScore")) || 0;
-        let isInputLocked = false; // Prevent double-clicks
+        let currentMode = "duel";
+        let isInputLocked = false;
+        let mapDataFeatures = [];
 
-        document.getElementById("high-score").innerText = highScore;
-
-        // D3 Map Setup
+        // Map Setup
         const container = document.getElementById("map-container");
         let width = container.clientWidth;
         let height = container.clientHeight;
@@ -235,17 +262,25 @@
         const svg = d3.select("#map-container").append("svg")
             .attr("width", width)
             .attr("height", height);
-
         const g = svg.append("g");
 
-        // Use a mercator projection tailored to fit nicely
         const projection = d3.geoMercator()
             .scale(width / 6.5)
             .translate([width / 2, height / 1.5]);
-        
         const path = d3.geoPath().projection(projection);
 
-        // Helper to place text labels correctly (handling disjointed territories)
+        const zoom = d3.zoom()
+            .scaleExtent([1, 15])
+            .translateExtent([[-width, -height], [width * 2, height * 2]])
+            .on("zoom", (event) => {
+                g.attr('transform', event.transform);
+                g.selectAll("path").attr("stroke-width", 0.5 / event.transform.k);
+                const newFontSize = Math.max(1.5, 4 / event.transform.k);
+                g.selectAll(".country-label").style("font-size", newFontSize + "px");
+            });
+        svg.call(zoom);
+
+        // Label overrides
         function getLabelTransform(d) {
             const overrides = {
                 "USA": [-98.5, 39.0], "FRA": [2.2, 46.2], "CAN": [-95.0, 60.0],
@@ -257,75 +292,80 @@
                 return `translate(${proj[0]}, ${proj[1]})`;
             }
             const centroid = path.centroid(d);
-            if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
-                return `translate(${centroid})`;
-            }
+            if (!isNaN(centroid[0]) && !isNaN(centroid[1])) return `translate(${centroid})`;
             return "translate(-1000,-1000)";
         }
 
-        // Map Zoom Behavior
-        const zoom = d3.zoom()
-            .scaleExtent([1, 15])
-            .translateExtent([[-width, -height], [width * 2, height * 2]])
-            .on("zoom", (event) => {
-                g.attr('transform', event.transform);
-                // Dynamically adjust stroke width so borders don't get too thick when zooming
-                g.selectAll("path").attr("stroke-width", 0.5 / event.transform.k);
-                
-                // Adjust label size based on zoom scale
-                const newFontSize = Math.max(1.5, 4 / event.transform.k);
-                g.selectAll(".country-label").style("font-size", newFontSize + "px");
-            });
-        
-        svg.call(zoom);
-
-        // Fetch GeoJSON and Initialize
+        // Initialize App
         d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(data) {
+            mapDataFeatures = data.features;
+            document.getElementById("loading-overlay").style.display = "none";
             
-            // Only add countries to the game loop if they exist in BOTH our target list AND the map data
-            const mapCountryIDs = data.features.map(f => f.id);
-            availableCountries = Object.keys(geoGuessrCountries).filter(id => mapCountryIDs.includes(id));
+            // Render map empty initially
+            renderMap({}); 
+            
+            // Show menu
+            document.getElementById("main-menu-overlay").classList.remove("hidden");
+            document.getElementById("main-menu-overlay").classList.add("flex");
+        });
+
+        function renderMap(dictionary) {
+            const mapCountryIDs = mapDataFeatures.map(f => f.id);
+            availableCountries = Object.keys(dictionary).filter(id => mapCountryIDs.includes(id));
 
             g.selectAll("path")
-                .data(data.features)
+                .data(mapDataFeatures)
                 .join("path")
                 .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable country")
                 .attr("d", path)
                 .attr("id", d => "country-" + d.id)
                 .on("click", handleCountryClick);
 
-            // Add country names to the map
             g.selectAll("text")
-                .data(data.features.filter(d => availableCountries.includes(d.id)))
+                .data(mapDataFeatures.filter(d => availableCountries.includes(d.id)))
                 .join("text")
                 .attr("class", "country-label")
                 .attr("transform", d => getLabelTransform(d))
-                .text(d => geoGuessrCountries[d.id].name);
+                .text(d => dictionary[d.id].name);
+        }
+
+        // Game Flow Controls
+        function startGame(mode) {
+            currentMode = mode;
+            activeDictionary = mode === 'duel' ? duelCountries : arbitraryCountries;
             
-            // Hide loading overlay and start
-            document.getElementById("loading-overlay").style.display = "none";
+            document.getElementById("current-mode-display").innerText = mode === 'duel' ? "Duel" : "Arbitrary";
+            document.getElementById("main-menu-overlay").classList.add("hidden");
+            document.getElementById("main-menu-overlay").classList.remove("flex");
+            document.getElementById("game-ui").classList.remove("hidden");
+            document.getElementById("game-ui").classList.add("flex");
+
+            // Reset UI and Map
+            score = 0;
+            document.getElementById("score").innerText = score;
+            svg.call(zoom.transform, d3.zoomIdentity); // Reset zoom
+            renderMap(activeDictionary); // Re-render with active list
+            
             startRound();
+        }
 
-        }).catch(err => {
-            console.error("Error loading map:", err);
-            document.getElementById("loading-overlay").innerHTML = "<h2 class='text-red-500 text-xl'>Error loading map data. Please check your connection and refresh.</h2>";
-        });
-
-        // Handle Window Resize
-        window.addEventListener("resize", () => {
-            width = container.clientWidth;
-            height = container.clientHeight;
-            svg.attr("width", width).attr("height", height);
-            // Re-center projection on resize
-            projection.translate([width / 2, height / 1.5]);
-            g.selectAll("path").attr("d", path);
-            g.selectAll(".country-label").attr("transform", d => getLabelTransform(d));
-        });
+        function showMainMenu() {
+            document.getElementById("game-over-overlay").classList.add("hidden");
+            document.getElementById("game-over-overlay").classList.remove("flex");
+            document.getElementById("game-ui").classList.add("hidden");
+            document.getElementById("game-ui").classList.remove("flex");
+            
+            document.getElementById("main-menu-overlay").classList.remove("hidden");
+            document.getElementById("main-menu-overlay").classList.add("flex");
+            
+            // Clear highlights
+            d3.selectAll(".guessed-correctly").classed("guessed-correctly", false);
+            d3.selectAll(".correct-flash").classed("correct-flash", false);
+            d3.selectAll(".incorrect-flash").classed("incorrect-flash", false);
+        }
 
         function startRound() {
             isInputLocked = false;
-            
-            // Pick random country, ensuring we don't pick the same one twice in a row
             let newTarget;
             do {
                 const randomIndex = Math.floor(Math.random() * availableCountries.length);
@@ -334,98 +374,140 @@
             
             currentTarget = newTarget;
             
-            // Fetch and set Flag
-            const flagData = geoGuessrCountries[currentTarget];
+            const flagData = activeDictionary[currentTarget];
             const flagImg = document.getElementById("flag-display");
-            const flagLoader = document.getElementById("flag-loader");
-            
             flagImg.classList.add("hidden");
-            flagLoader.classList.remove("hidden");
-            
-            // Using standard high-res FlagCDN images
+            document.getElementById("flag-loader").classList.remove("hidden");
             flagImg.src = `https://flagcdn.com/w320/${flagData.code2}.png`;
         }
 
         function handleCountryClick(event, d) {
-            // Ignore clicks if game is transitioning or if clicking unplayable area
             if (isInputLocked || !availableCountries.includes(d.id)) return;
-            
             isInputLocked = true;
-            const clickedCountry = d.id;
+            
             const clickedPath = d3.select(this);
 
-            if (clickedCountry === currentTarget) {
-                // Correct
+            if (d.id === currentTarget) {
                 score++;
-                updateScore(score);
-                
-                // Visual feedback (Stay Green)
+                document.getElementById("score").innerText = score;
                 clickedPath.classed("guessed-correctly", true);
-                
-                setTimeout(() => {
-                    startRound();
-                }, 400);
-
+                setTimeout(startRound, 400);
             } else {
-                // Incorrect
                 clickedPath.classed("incorrect-flash", true);
-                
-                // Also highlight the correct answer so they can learn it
                 const correctPath = d3.select("#country-" + currentTarget);
                 correctPath.classed("correct-flash", true);
 
                 setTimeout(() => {
                     showGameOver();
-                    clickedPath.classed("incorrect-flash", false);
-                    correctPath.classed("correct-flash", false);
                 }, 600);
-            }
-        }
-
-        function updateScore(newScore) {
-            document.getElementById("score").innerText = newScore;
-            
-            // Animate score bump
-            const scoreEl = document.getElementById("score");
-            scoreEl.style.transform = "scale(1.5)";
-            scoreEl.style.color = "#4ade80"; // green-400
-            
-            setTimeout(() => {
-                scoreEl.style.transform = "scale(1)";
-                scoreEl.style.color = "#60a5fa"; // blue-400
-            }, 200);
-
-            if (newScore > highScore) {
-                highScore = newScore;
-                localStorage.setItem("flagGuesserHighScore", highScore);
-                document.getElementById("high-score").innerText = highScore;
             }
         }
 
         function showGameOver() {
             document.getElementById("final-score").innerText = score;
-            document.getElementById("correct-answer-name").innerText = geoGuessrCountries[currentTarget].name;
+            document.getElementById("correct-answer-name").innerText = activeDictionary[currentTarget].name;
+            
+            // Reset save form
+            document.getElementById("player-name").value = "";
+            document.getElementById("save-msg").classList.add("hidden");
+            document.getElementById("score-submit-section").style.display = score > 0 ? "block" : "none";
+
             document.getElementById("game-over-overlay").classList.remove("hidden");
             document.getElementById("game-over-overlay").classList.add("flex");
         }
 
         function restartGame() {
-            score = 0;
-            document.getElementById("score").innerText = score;
+            document.getElementById("game-over-overlay").classList.add("hidden");
+            document.getElementById("game-over-overlay").classList.remove("flex");
             
-            const overlay = document.getElementById("game-over-overlay");
-            overlay.classList.add("hidden");
-            overlay.classList.remove("flex");
-            
-            // Clear all highlights
             d3.selectAll(".guessed-correctly").classed("guessed-correctly", false);
             d3.selectAll(".correct-flash").classed("correct-flash", false);
             d3.selectAll(".incorrect-flash").classed("incorrect-flash", false);
-            
-            // Reset map zoom smoothly
             svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
             
+            score = 0;
+            document.getElementById("score").innerText = score;
             startRound();
+        }
+
+        // --- Leaderboard Logic ---
+        function saveScore() {
+            const nameInput = document.getElementById("player-name").value.trim();
+            if (!nameInput) return;
+
+            const newEntry = {
+                name: nameInput,
+                score: score,
+                mode: currentMode === 'duel' ? 'Duel' : 'Arbitrary',
+                date: new Date().getTime()
+            };
+
+            // Fetch existing from LocalStorage
+            let leaderboard = JSON.parse(localStorage.getItem("flagGamerLeaderboard")) || [];
+            leaderboard.push(newEntry);
+            
+            // Sort by score (descending)
+            leaderboard.sort((a, b) => b.score - a.score);
+            
+            // Keep top 50
+            leaderboard = leaderboard.slice(0, 50);
+            localStorage.setItem("flagGamerLeaderboard", JSON.stringify(leaderboard));
+
+            document.getElementById("save-msg").classList.remove("hidden");
+            setTimeout(showLeaderboard, 1000);
+        }
+
+        function showLeaderboard() {
+            document.getElementById("main-menu-overlay").classList.add("hidden");
+            document.getElementById("main-menu-overlay").classList.remove("flex");
+            document.getElementById("game-over-overlay").classList.add("hidden");
+            document.getElementById("game-over-overlay").classList.remove("flex");
+            
+            const tbody = document.getElementById("leaderboard-body");
+            tbody.innerHTML = ""; // Clear current
+
+            const leaderboard = JSON.parse(localStorage.getItem("flagGamerLeaderboard")) || [];
+
+            if (leaderboard.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">No scores saved yet!</td></tr>`;
+            } else {
+                leaderboard.forEach((entry, index) => {
+                    let rankColor = "text-slate-300";
+                    if (index === 0) rankColor = "text-yellow-400 font-bold";
+                    if (index === 1) rankColor = "text-slate-300 font-bold";
+                    if (index === 2) rankColor = "text-amber-600 font-bold";
+
+                    const modeColor = entry.mode === 'Duel' ? 'bg-blue-600/20 text-blue-400' : 'bg-emerald-600/20 text-emerald-400';
+
+                    const row = `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="py-3 ${rankColor}">#${index + 1}</td>
+                            <td class="py-3 font-semibold text-white">${entry.name}</td>
+                            <td class="py-3 text-center"><span class="px-2 py-1 rounded text-xs font-bold ${modeColor}">${entry.mode}</span></td>
+                            <td class="py-3 text-right font-black text-white">${entry.score}</td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+            }
+
+            document.getElementById("leaderboard-modal").classList.remove("hidden");
+            document.getElementById("leaderboard-modal").classList.add("flex");
+        }
+
+        function closeLeaderboard() {
+            document.getElementById("leaderboard-modal").classList.add("hidden");
+            document.getElementById("leaderboard-modal").classList.remove("flex");
+            
+            // Return to main menu if we aren't in game
+            if (document.getElementById("game-ui").classList.contains("hidden")) {
+                document.getElementById("main-menu-overlay").classList.remove("hidden");
+                document.getElementById("main-menu-overlay").classList.add("flex");
+            } else {
+                // If we were in the game-over state, go back there
+                document.getElementById("game-over-overlay").classList.remove("hidden");
+                document.getElementById("game-over-overlay").classList.add("flex");
+            }
         }
     </script>
 </body>
