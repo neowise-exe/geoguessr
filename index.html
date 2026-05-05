@@ -15,22 +15,25 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0f172a; touch-action: none; }
-        #map-container { width: 100vw; height: 100vh; background-color: #1e293b; z-index: 1; }
+        body { margin: 0; overflow: hidden; background-color: #aad3df; touch-action: none; }
+        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; z-index: 1; }
         
+        /* GeoGuessr Style Labels (Dark gray, clean) */
         .country-label {
             background: transparent; border: none; box-shadow: none;
-            font-weight: 800; font-size: 14px; color: #111827;
-            text-shadow: -1.5px -1.5px 0 rgba(255,255,255,0.7), 1.5px -1.5px 0 rgba(255,255,255,0.7), -1.5px 1.5px 0 rgba(255,255,255,0.7), 1.5px 1.5px 0 rgba(255,255,255,0.7);
-            text-align: center; pointer-events: none; opacity: 0.8;
+            font-weight: 700; font-size: 13px; color: #4b5563; /* Gray-600 */
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.9), -1px -1px 0px rgba(255,255,255,0.9);
+            text-align: center; pointer-events: none; opacity: 0.9;
+            transition: opacity 0.3s ease;
         }
+        
+        /* Labels only disappear at very high zoom (fully zoomed in) */
         .hide-labels .country-label { opacity: 0 !important; }
         
         .flag-loading { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         
-        /* Ensure overlays are above map */
-        .overlay-z { z-index: 9999; }
+        .leaflet-container { background: #aad3df !important; }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
@@ -46,7 +49,7 @@
                 <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">/ <span id="total-countries">0</span></span>
             </div>
         </div>
-        <div class="h-16 w-24 md:h-20 md:w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden flex items-center justify-center">
+        <div class="h-16 w-24 md:h-20 md:w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-lg">
             <div id="flag-loader" class="text-slate-500 text-xs flag-loading hidden">Loading...</div>
             <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
         </div>
@@ -63,8 +66,8 @@
             <div id="db-status" class="text-xs font-bold mb-8 text-amber-400 italic">Connecting to Firebase...</div>
             
             <div id="menu-buttons" class="space-y-4 mb-8 opacity-50 pointer-events-none">
-                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition">Duel Practice</button>
-                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition">Arbitrary World</button>
+                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-lg">Duel Practice</button>
+                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition shadow-lg">Arbitrary World</button>
             </div>
             <button onclick="showLeaderboard()" class="text-slate-300 hover:text-white underline text-sm">View Global Leaderboard</button>
         </div>
@@ -72,33 +75,33 @@
 
     <!-- Game Over -->
     <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-[4000] hidden flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 text-center max-w-md w-full">
+        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 text-center max-w-md w-full shadow-2xl">
             <h1 class="text-3xl font-black text-red-500 mb-2">Incorrect!</h1>
             <p class="text-slate-300 mb-6">That was <span id="correct-answer-name" class="font-bold text-blue-400">Country</span></p>
             <div class="text-5xl font-black text-white mb-8" id="final-score-val">0</div>
             
             <div id="score-submit-section" class="bg-slate-700/50 p-4 rounded-xl mb-6">
                 <div class="flex gap-2">
-                    <input type="text" id="player-name" placeholder="Enter Name" class="flex-1 bg-slate-900 border border-slate-600 p-2 rounded text-sm text-white">
-                    <button id="save-score-btn" onclick="saveScore()" class="bg-amber-500 text-slate-900 font-bold px-4 rounded transition">Save</button>
+                    <input type="text" id="player-name" placeholder="Enter Name" class="flex-1 bg-slate-900 border border-slate-600 p-2 rounded text-sm text-white focus:border-blue-500 outline-none">
+                    <button id="save-score-btn" onclick="saveScore()" class="bg-amber-500 text-slate-900 font-bold px-4 rounded transition hover:bg-amber-400">Save</button>
                 </div>
                 <p id="save-msg" class="text-xs font-bold mt-2 hidden"></p>
             </div>
             
-            <button onclick="location.reload()" class="w-full bg-blue-600 py-3 rounded-xl font-bold">Main Menu</button>
+            <button onclick="location.reload()" class="w-full bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 shadow-lg">Main Menu</button>
         </div>
     </div>
 
     <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-[5000] hidden flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 max-w-lg w-full flex flex-col max-h-[80vh]">
+        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 max-w-lg w-full flex flex-col max-h-[80vh] shadow-2xl">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black">Global High Scores</h2>
-                <button onclick="document.getElementById('leaderboard-modal').classList.add('hidden')" class="text-slate-400 text-2xl">✖</button>
+                <button onclick="document.getElementById('leaderboard-modal').classList.add('hidden')" class="text-slate-400 text-2xl hover:text-white transition">✖</button>
             </div>
             <div class="overflow-y-auto flex-1">
                 <table class="w-full text-left">
-                    <thead class="text-slate-500 text-xs uppercase">
+                    <thead class="text-slate-500 text-xs uppercase border-b border-slate-700">
                         <tr><th class="p-2">Rank</th><th class="p-2">Name</th><th class="p-2 text-right">Score</th></tr>
                     </thead>
                     <tbody id="leaderboard-body"></tbody>
@@ -141,21 +144,29 @@
         const duelCountries = { "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia" }, "MKD": { code2: "mk", name: "N. Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "SGP": { code2: "sg", name: "Singapore" } };
         const arbitraryCountries = { ...duelCountries, "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "ATA": { code2: "aq", name: "Antarctica" }, "CUB": { code2: "cu", name: "Cuba" }, "PRK": { code2: "kp", name: "North Korea" } };
 
+        // Location overrides for properly centering names
+        const labelOverrides = { "USA": [39.0, -98.5], "CAN": [56.0, -100.0], "FRA": [46.2, 2.2], "GBR": [54.3, -2.4], "NOR": [61.0, 10.0], "HRV": [45.1, 15.2], "GRC": [38.5, 22.5], "RUS": [62.0, 95.0], "CHL": [-33.0, -71.0], "IDN": [-1.0, 115.0] };
+
         // --- 4. ENGINE ---
         let map, geojsonLayer, labelsLayer, activeDict, availableIDs, unplayed, currentTarget, scoreCount, isLocked, geoData, polygons = {};
 
         function initMap() {
-            map = L.map('map-container', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 9, zoomControl: false });
+            // Light GeoGuessr-style map
+            map = L.map('map-container', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10, zoomControl: false });
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
             
-            map.on('zoomend', () => map.getZoom() > 4 ? document.getElementById('map-container').classList.add('hide-labels') : document.getElementById('map-container').classList.remove('hide-labels'));
+            // Stylized Topo Map (Matches your screenshot much better than satellite)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { 
+                attribution: 'Esri' 
+            }).addTo(map);
+            
+            // Labels only hide when fully zoomed in (Zoom 7 or higher)
+            map.on('zoomend', () => map.getZoom() > 6 ? document.getElementById('map-container').classList.add('hide-labels') : document.getElementById('map-container').classList.remove('hide-labels'));
             
             fetch("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
                 .then(r => r.json())
                 .then(data => {
                     geoData = data;
-                    // Unlock Buttons
                     document.getElementById("menu-buttons").classList.remove("opacity-50", "pointer-events-none");
                 });
         }
@@ -184,12 +195,14 @@
             labelsLayer = L.layerGroup().addTo(map);
             geojsonLayer = L.geoJSON(geoData, {
                 filter: f => availableIDs.includes(f.id),
-                style: { color: 'rgba(255,255,255,0.4)', weight: 1, fillColor: 'transparent', fillOpacity: 0.01 },
+                style: { color: 'rgba(0,0,0,0.15)', weight: 1.5, fillColor: 'transparent', fillOpacity: 0.01 },
                 onEachFeature: (f, l) => {
                     polygons[f.id] = l;
                     l.on('click', () => handleGuess(f.id, l));
-                    const label = L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'country-label', html: activeDict[f.id].name, iconSize: [100, 20] }),
+                    
+                    const center = labelOverrides[f.id] || l.getBounds().getCenter();
+                    const label = L.marker(center, {
+                        icon: L.divIcon({ className: 'country-label', html: activeDict[f.id].name, iconSize: [120, 20] }),
                         interactive: false
                     });
                     label.addTo(labelsLayer);
@@ -216,12 +229,12 @@
                 playCorrectSound();
                 scoreCount++;
                 document.getElementById("score").innerText = scoreCount;
-                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 0.5 });
+                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 0.4 });
                 setTimeout(startRound, 400);
             } else {
                 playIncorrectSound();
-                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 0.6 });
-                if (polygons[currentTarget]) polygons[currentTarget].setStyle({ fillColor: '#22c55e', fillOpacity: 0.6 });
+                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 0.5 });
+                if (polygons[currentTarget]) polygons[currentTarget].setStyle({ fillColor: '#22c55e', fillOpacity: 0.4 });
                 setTimeout(showGameOver, 800);
             }
         }
@@ -241,6 +254,7 @@
                 document.getElementById("save-msg").innerText = "Saved!";
                 document.getElementById("save-msg").classList.remove("hidden");
                 document.getElementById("save-score-btn").disabled = true;
+                document.getElementById("save-score-btn").classList.add("opacity-50");
             } catch (e) { console.error(e); }
         }
 
@@ -253,7 +267,7 @@
             if (!db) { body.innerHTML = "<tr><td colspan='3' class='p-4 text-center'>Offline</td></tr>"; return; }
             
             try {
-                const snap = await db.collection("leaderboard").orderBy("score", "desc").limit(10).get();
+                const snap = await db.collection("leaderboard").orderBy("score", "desc").limit(15).get();
                 body.innerHTML = snap.docs.map((d, i) => {
                     const data = d.data();
                     return `<tr class='border-b border-slate-700 hover:bg-slate-700/50'><td class='p-3'>#${i+1}</td><td class='p-3 font-bold'>${data.name}</td><td class='p-3 text-right text-blue-400 font-black'>${data.score}</td></tr>`;
