@@ -21,7 +21,8 @@
         .country {
             fill: #334155; 
             stroke: #0f172a;
-            stroke-width: 0.5px;
+            /* Thinner base stroke */
+            stroke-width: 0.3px;
             transition: fill 0.15s ease;
             outline: none;
         }
@@ -187,7 +188,7 @@
     </div>
 
     <script>
-        // 1. Duel Mode Countries (Standard 70)
+        // 1. Duel Mode Countries (Expanded)
         const duelCountries = {
             "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" },
             "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" },
@@ -224,7 +225,15 @@
             "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" },
             "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" },
             "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" },
-            "KHM": { code2: "kh", name: "Cambodia" }
+            "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" },
+            "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" },
+            "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" },
+            "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" },
+            "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" },
+            "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" },
+            "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" },
+            "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" },
+            "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" }
         };
 
         // 2. Arbitrary Additions (Islands, territories, obscure flags)
@@ -252,6 +261,7 @@
         // Game State Variables
         let activeDictionary = {};
         let availableCountries = []; 
+        let unplayedCountries = []; // The "bag" of remaining countries to draw from
         let currentTarget = "";
         let score = 0;
         let currentMode = "duel";
@@ -273,13 +283,15 @@
             .translate([width / 2, height / 1.5]);
         const path = d3.geoPath().projection(projection);
 
+        // Updated Zoom - More scaling limit, thinner stroke transitions
         const zoom = d3.zoom()
-            .scaleExtent([1, 15])
+            .scaleExtent([1, 25]) // Let user zoom in deeper
             .translateExtent([[-width, -height], [width * 2, height * 2]])
             .on("zoom", (event) => {
                 g.attr('transform', event.transform);
-                g.selectAll("path").attr("stroke-width", 0.5 / event.transform.k);
-                const newFontSize = Math.max(1.5, 4 / event.transform.k);
+                // Dynamically shrink borders based on zoom level
+                g.selectAll("path").attr("stroke-width", 0.3 / event.transform.k);
+                const newFontSize = Math.max(0.5, 3 / event.transform.k);
                 g.selectAll(".country-label").style("font-size", newFontSize + "px");
             });
         svg.call(zoom);
@@ -352,6 +364,9 @@
             
             document.getElementById("total-countries").innerText = availableCountries.length;
             
+            // Fill the bag with all available countries
+            unplayedCountries = [...availableCountries];
+            
             startRound();
         }
 
@@ -372,13 +387,18 @@
 
         function startRound() {
             isInputLocked = false;
-            let newTarget;
-            do {
-                const randomIndex = Math.floor(Math.random() * availableCountries.length);
-                newTarget = availableCountries[randomIndex];
-            } while (newTarget === currentTarget && availableCountries.length > 1);
             
-            currentTarget = newTarget;
+            // If the user somehow successfully guessed every single country, reset the bag!
+            if (unplayedCountries.length === 0) {
+                unplayedCountries = [...availableCountries];
+            }
+            
+            // Draw a random country from the unplayed bag
+            const randomIndex = Math.floor(Math.random() * unplayedCountries.length);
+            currentTarget = unplayedCountries[randomIndex];
+            
+            // Remove the selected country from the bag so it doesn't repeat
+            unplayedCountries.splice(randomIndex, 1);
             
             const flagData = activeDictionary[currentTarget];
             const flagImg = document.getElementById("flag-display");
@@ -433,6 +453,10 @@
             
             score = 0;
             document.getElementById("score").innerText = score;
+            
+            // Reset the bag of unplayed countries
+            unplayedCountries = [...availableCountries];
+            
             startRound();
         }
 
