@@ -9,9 +9,8 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, setDoc, getDocs, query, where, doc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Your specific Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCmVeROPkTPAQWP7Wp9rMCibRNDrVZdYN8",
             authDomain: "flagguessrneo.firebaseapp.com",
@@ -25,29 +24,48 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- GLOBAL FIREBASE FUNCTIONS ---
+        // --- UPDATED HIGH SCORE LOGIC ---
         window.saveScore = async function() {
             const username = document.getElementById("username-input").value.trim();
             if (!username) return alert("Please enter a name!");
             
             const btn = document.getElementById("save-btn");
             btn.disabled = true;
-            btn.innerText = "Saving...";
+            btn.innerText = "Checking...";
 
             try {
-                await addDoc(collection(db, "leaderboard"), {
-                    name: username,
-                    score: window.score, // Reference the global score
-                    mode: window.currentMode,
-                    timestamp: new Date()
-                });
-                alert("Score saved!");
-                location.reload(); // Refresh to reset
+                // Check if user already exists
+                const q = query(collection(db, "leaderboard"), where("name", "==", username));
+                const querySnapshot = await getDocs(q);
+                
+                let shouldUpdate = true;
+                let docId = username.toLowerCase().replace(/\s+/g, '-'); // Create a unique ID from name
+
+                if (!querySnapshot.empty) {
+                    const existingData = querySnapshot.docs[0].data();
+                    if (window.score <= existingData.score) {
+                        alert(`You already have a higher or equal score of ${existingData.score}! Keep practicing!`);
+                        shouldUpdate = false;
+                    }
+                    docId = querySnapshot.docs[0].id; // Use existing doc ID
+                }
+
+                if (shouldUpdate) {
+                    btn.innerText = "Updating...";
+                    await setDoc(doc(db, "leaderboard", docId), {
+                        name: username,
+                        score: window.score,
+                        mode: window.currentMode,
+                        timestamp: new Date()
+                    }, { merge: true });
+                    alert("High score logged!");
+                }
+                
+                location.reload();
             } catch (e) {
-                console.error("Error adding document: ", e);
+                console.error("Error saving score: ", e);
                 btn.disabled = false;
                 btn.innerText = "Try Again";
-                alert("Make sure your Firestore rules are set to Test Mode!");
             }
         };
 
@@ -61,7 +79,6 @@
                 const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
                 const querySnapshot = await getDocs(q);
                 body.innerHTML = "";
-                
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
                     body.innerHTML += `
@@ -69,21 +86,18 @@
                             <td class="py-3 px-2 font-bold text-blue-400">${data.name}</td>
                             <td class="py-3 px-2 text-right text-emerald-400 font-bold">${data.score}</td>
                             <td class="py-3 px-2 text-right text-slate-500 text-xs uppercase">${data.mode}</td>
-                        </tr>
-                    `;
+                        </tr>`;
                 });
             } catch (e) {
                 body.innerHTML = "<tr><td colspan='3' class='text-center text-red-400'>Error loading data.</td></tr>";
             }
         };
 
-        window.closeLeaderboard = function() {
-            document.getElementById("leaderboard-modal").classList.add("hidden");
-        };
+        window.closeLeaderboard = () => document.getElementById("leaderboard-modal").classList.add("hidden");
     </script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #aad3df; }
+        body { margin: 0; overflow: hidden; background-color: #0f172a; }
         #map-container { width: 100vw; height: 100vh; background-color: #aad3df; cursor: crosshair; }
         .country { fill: #475569; stroke: #1e293b; stroke-width: 0.2px; transition: fill 0.15s ease; outline: none; }
         .country:hover { fill: #fde047; }
@@ -99,23 +113,34 @@
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- UI Overlay -->
-    <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 hidden items-center justify-between px-6 py-3">
-        <div class="flex items-center gap-3">
-            <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition mr-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+    <!-- Centered Bar Layout -->
+    <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 hidden items-center px-6 py-3">
+        <div class="flex items-center gap-3 w-1/3">
+            <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition" title="Back to Menu">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
-            <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
-                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Score</span>
-                <span id="score" class="text-2xl font-black text-blue-400">0</span>
+            <div class="bg-slate-800 rounded-lg px-4 py-1 border border-slate-600 text-center min-w-[80px]">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block leading-tight">Score</span>
+                <span id="score-display" class="text-xl font-black text-blue-400 leading-tight">0 <span class="text-xs text-slate-500 font-bold">/ 0</span></span>
+            </div>
+            <div class="bg-slate-800 rounded-lg px-4 py-1 border border-slate-600 text-center min-w-[80px]">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block leading-tight">Mode</span>
+                <span id="current-mode-display" class="text-sm font-bold text-amber-400 leading-normal uppercase">Duel</span>
             </div>
         </div>
-        <div class="h-20 w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden flex items-center justify-center">
-            <div id="flag-loader" class="text-slate-500 text-sm flag-loading hidden">Loading...</div>
-            <img id="flag-display" src="" alt="Flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
+
+        <div class="flex justify-center w-1/3">
+            <div class="h-16 w-28 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden shadow-2xl flex items-center justify-center">
+                <div id="flag-loader" class="text-slate-500 text-xs flag-loading hidden">Loading...</div>
+                <img id="flag-display" src="" alt="Flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
+            </div>
         </div>
-        <div class="text-right text-sm text-slate-400">
-            <span id="current-mode-display" class="text-amber-400 font-bold uppercase">Duel</span>
+
+        <div class="flex justify-end w-1/3 text-right text-[10px] text-slate-400 space-y-0 leading-tight">
+            <div>
+                <p>Scroll to <span class="text-slate-200 font-semibold uppercase">Zoom</span></p>
+                <p>Click & Drag to <span class="text-slate-200 font-semibold uppercase">Pan</span></p>
+            </div>
         </div>
     </div>
 
@@ -124,10 +149,10 @@
     <!-- Main Menu -->
     <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 z-40 flex flex-col items-center justify-center">
         <div class="bg-slate-800 p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-lg w-full mx-4">
-            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-8">FlagGuessr</h1>
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-8 tracking-tighter">FlagGuessr</h1>
             <div class="space-y-4 mb-8">
-                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition">Duel Practice</button>
-                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition">Arbitrary World</button>
+                <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-lg">Duel Practice</button>
+                <button onclick="startGame('arbitrary')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition shadow-lg">Arbitrary World</button>
             </div>
             <button onclick="showLeaderboard()" class="text-slate-300 hover:text-white font-semibold underline transition">View Leaderboard</button>
         </div>
@@ -137,17 +162,17 @@
     <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-40 hidden flex-col items-center justify-center">
         <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 shadow-2xl text-center max-w-md w-full mx-4">
             <h1 class="text-4xl font-black text-red-500 mb-2">Incorrect!</h1>
-            <p class="text-slate-300 mb-4">That was <span id="correct-answer-name" class="font-bold text-blue-400 block">Country</span></p>
+            <p class="text-slate-300 mb-4">That was <span id="correct-answer-name" class="font-bold text-blue-400 block text-2xl mt-1">Country</span></p>
             
-            <div class="mb-6 bg-slate-900/50 p-4 rounded-xl border border-slate-700">
-                <div class="text-sm text-slate-400 mb-2">Save score: <span id="final-score" class="text-white font-bold">0</span></div>
-                <input type="text" id="username-input" maxlength="15" placeholder="Your Name" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 mb-3">
-                <button id="save-btn" onclick="saveScore()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg transition">Submit</button>
+            <div class="mb-6 bg-slate-900/50 p-5 rounded-xl border border-slate-700">
+                <div class="text-sm text-slate-400 mb-3">Save score: <span id="final-score" class="text-white font-bold text-lg">0</span></div>
+                <input type="text" id="username-input" maxlength="15" placeholder="Enter Username" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 mb-3 text-center">
+                <button id="save-btn" onclick="saveScore()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition uppercase tracking-wider text-sm">Update High Score</button>
             </div>
 
             <div class="flex gap-3">
-                <button onclick="restartGame()" class="flex-1 bg-blue-600 py-3 rounded-xl font-bold">Try Again</button>
-                <button onclick="location.reload()" class="flex-1 bg-slate-600 py-3 rounded-xl font-bold">Menu</button>
+                <button onclick="restartGame()" class="flex-1 bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 transition">Try Again</button>
+                <button onclick="location.reload()" class="flex-1 bg-slate-600 py-3 rounded-xl font-bold hover:bg-slate-500 transition">Menu</button>
             </div>
         </div>
     </div>
@@ -156,11 +181,14 @@
     <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-50 hidden flex-col items-center justify-center">
         <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black">Top Streaks</h2>
-                <button onclick="closeLeaderboard()" class="text-2xl">&times;</button>
+                <h2 class="text-2xl font-black text-white">Top Streaks</h2>
+                <button onclick="closeLeaderboard()" class="text-3xl text-slate-400 hover:text-white">&times;</button>
             </div>
             <div class="overflow-y-auto">
                 <table class="w-full text-left">
+                    <thead class="text-[10px] text-slate-500 uppercase">
+                        <tr><th class="pb-2 px-2">Player</th><th class="pb-2 text-right px-2">Score</th><th class="pb-2 text-right px-2">Mode</th></tr>
+                    </thead>
                     <tbody id="leaderboard-body"></tbody>
                 </table>
             </div>
@@ -172,7 +200,6 @@
     </div>
 
     <script>
-        // --- GAME LOGIC ---
         const duelCountries = { "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" }, "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" }, "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" }, "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" } };
         const arbitraryAdditions = { "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
         const arbitraryCountries = { ...duelCountries, ...arbitraryAdditions };
@@ -239,9 +266,12 @@
             activeDictionary = mode === 'duel' ? duelCountries : arbitraryCountries;
             document.getElementById("current-mode-display").innerText = mode;
             document.getElementById("main-menu-overlay").classList.add("hidden");
-            document.getElementById("game-ui").classList.remove("hidden");
-            window.score = 0; document.getElementById("score").innerText = 0;
+            document.getElementById("game-ui").classList.remove("flex");
+            document.getElementById("game-ui").classList.add("flex");
+            document.getElementById("game-ui").style.display = "flex";
+            window.score = 0; 
             renderMap(activeDictionary);
+            document.getElementById("score-display").innerHTML = `0 <span class="text-xs text-slate-500 font-bold">/ ${availableCountries.length}</span>`;
             unplayedCountries = [...availableCountries];
             startRound();
         }
@@ -259,7 +289,8 @@
             if (isInputLocked || !availableCountries.includes(d.id)) return;
             isInputLocked = true;
             if (d.id === currentTarget) {
-                window.score++; document.getElementById("score").innerText = window.score;
+                window.score++; 
+                document.getElementById("score-display").innerHTML = `${window.score} <span class="text-xs text-slate-500 font-bold">/ ${availableCountries.length}</span>`;
                 d3.select(this).classed("guessed-correctly", true);
                 setTimeout(startRound, 400);
             } else {
@@ -279,7 +310,8 @@
         function restartGame() {
             document.getElementById("game-over-overlay").classList.add("hidden");
             renderMap(activeDictionary);
-            window.score = 0; document.getElementById("score").innerText = 0;
+            window.score = 0; 
+            document.getElementById("score-display").innerHTML = `0 <span class="text-xs text-slate-500 font-bold">/ ${availableCountries.length}</span>`;
             unplayedCountries = [...availableCountries];
             startRound();
         }
