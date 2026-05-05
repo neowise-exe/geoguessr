@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoGuessr Flag Trainer</title>
+    <!-- Tailwind CSS for rapid, modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js for SVG Map Rendering and Zoom/Pan -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Custom map styles */
+        body { margin: 0; overflow: hidden; background-color: #0f172a; }
+        
+        #map-container {
+            width: 100vw;
+            height: 100vh;
+            background-color: #1e293b; /* Ocean color */
+            cursor: crosshair;
+        }
+
+        .country {
+            fill: #334155; /* Land color */
+            stroke: #0f172a; /* Border color */
+            stroke-width: 0.5px;
+            transition: fill 0.15s ease;
+            outline: none;
+        }
+
+        .country:hover {
+            fill: #60a5fa; /* Hover highlight color */
+        }
+
+        .correct-flash {
+            fill: #22c55e !important; /* Green correct flash */
+        }
+        
+        .guessed-correctly {
+            fill: #22c55e !important; /* Keep green */
+        }
+
+        .incorrect-flash {
+            fill: #ef4444 !important; /* Red incorrect flash */
+        }
+
+        .country-label {
+            pointer-events: none;
+            fill: #cbd5e1;
+            font-size: 3px;
+            font-weight: 600;
+            text-anchor: middle;
+            user-select: none;
+            opacity: 0.8;
+            text-shadow: 0px 0px 1px rgba(15, 23, 42, 0.8);
+        }
+
+        /* Hide map elements that aren't in our playable list */
+        .non-playable {
+            pointer-events: none;
+            fill: #1e293b; 
+            stroke: #334155;
+        }
+        
+        .flag-loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="text-white font-sans antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <div class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 flex items-center justify-between px-6 py-3">
+        <!-- Streak Counter -->
+        <div class="flex items-center gap-3">
+            <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
+                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">Streak</span>
+                <span id="score" class="text-2xl font-black text-blue-400">0</span>
+            </div>
+            <div class="bg-slate-800 rounded-lg px-4 py-2 border border-slate-600 flex flex-col items-center">
+                <span class="text-xs text-slate-400 uppercase font-bold tracking-wider">High Score</span>
+                <span id="high-score" class="text-2xl font-black text-amber-400">0</span>
+            </div>
+        </div>
+
+        <!-- Target Flag -->
+        <div class="relative group">
+            <div class="h-20 w-32 bg-slate-800 rounded-md border-2 border-slate-600 overflow-hidden shadow-inner flex items-center justify-center">
+                <div id="flag-loader" class="text-slate-500 text-sm flag-loading hidden">Loading...</div>
+                <img id="flag-display" src="" alt="Guess this flag" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
+            </div>
+            <!-- Tooltip info -->
+            <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Identify this flag
+            </div>
+        </div>
+
+        <!-- Controls Info -->
+        <div class="text-right text-sm text-slate-400 hidden md:block">
+            <p>Scroll to <span class="text-slate-200 font-semibold">Zoom</span></p>
+            <p>Click & Drag to <span class="text-slate-200 font-semibold">Pan</span></p>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-xl font-bold text-slate-200">Generating World Map...</h2>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-40 hidden flex-col items-center justify-center">
+        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 shadow-2xl text-center max-w-md w-full mx-4">
+            <div class="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </div>
+            <h1 class="text-4xl font-black text-white mb-2">Incorrect!</h1>
+            <p class="text-slate-300 text-lg mb-6">
+                That was <span id="correct-answer-name" class="font-bold text-blue-400 text-2xl block mt-2">Country Name</span>
+            </p>
+            
+            <div class="flex justify-center gap-4 mb-8">
+                <div class="text-center">
+                    <div class="text-sm text-slate-400 mb-1">Final Streak</div>
+                    <div id="final-score" class="text-3xl font-bold text-white">0</div>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 transform hover:scale-[1.02] active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Extensive list of typical GeoGuessr countries and territories
+        // Mapping Alpha-3 map codes to Alpha-2 flag codes
+        const geoGuessrCountries = {
+            "USA": { code2: "us", name: "United States" },
+            "CAN": { code2: "ca", name: "Canada" },
+            "MEX": { code2: "mx", name: "Mexico" },
+            "BRA": { code2: "br", name: "Brazil" },
+            "ARG": { code2: "ar", name: "Argentina" },
+            "COL": { code2: "co", name: "Colombia" },
+            "PER": { code2: "pe", name: "Peru" },
+            "CHL": { code2: "cl", name: "Chile" },
+            "GBR": { code2: "gb", name: "United Kingdom" },
+            "FRA": { code2: "fr", name: "France" },
+            "DEU": { code2: "de", name: "Germany" },
+            "ITA": { code2: "it", name: "Italy" },
+            "ESP": { code2: "es", name: "Spain" },
+            "SWE": { code2: "se", name: "Sweden" },
+            "NOR": { code2: "no", name: "Norway" },
+            "FIN": { code2: "fi", name: "Finland" },
+            "POL": { code2: "pl", name: "Poland" },
+            "RUS": { code2: "ru", name: "Russia" },
+            "ZAF": { code2: "za", name: "South Africa" },
+            "KEN": { code2: "ke", name: "Kenya" },
+            "NGA": { code2: "ng", name: "Nigeria" },
+            "AUS": { code2: "au", name: "Australia" },
+            "NZL": { code2: "nz", name: "New Zealand" },
+            "JPN": { code2: "jp", name: "Japan" },
+            "KOR": { code2: "kr", name: "South Korea" },
+            "IND": { code2: "in", name: "India" },
+            "IDN": { code2: "id", name: "Indonesia" },
+            "THA": { code2: "th", name: "Thailand" },
+            "MYS": { code2: "my", name: "Malaysia" },
+            "PHL": { code2: "ph", name: "Philippines" },
+            "VNM": { code2: "vn", name: "Vietnam" },
+            "TUR": { code2: "tr", name: "Turkey" },
+            "EGY": { code2: "eg", name: "Egypt" },
+            "GRL": { code2: "gl", name: "Greenland" },
+            "ISL": { code2: "is", name: "Iceland" },
+            "IRL": { code2: "ie", name: "Ireland" },
+            "PRT": { code2: "pt", name: "Portugal" },
+            "CHE": { code2: "ch", name: "Switzerland" },
+            "AUT": { code2: "at", name: "Austria" },
+            "CZE": { code2: "cz", name: "Czechia" },
+            "SVK": { code2: "sk", name: "Slovakia" },
+            "HUN": { code2: "hu", name: "Hungary" },
+            "ROU": { code2: "ro", name: "Romania" },
+            "BGR": { code2: "bg", name: "Bulgaria" },
+            "GRC": { code2: "gr", name: "Greece" },
+            "HRV": { code2: "hr", name: "Croatia" },
+            "SRB": { code2: "rs", name: "Serbia" },
+            "UKR": { code2: "ua", name: "Ukraine" },
+            "ARE": { code2: "ae", name: "United Arab Emirates" },
+            "ISR": { code2: "il", name: "Israel" },
+            "SAU": { code2: "sa", name: "Saudi Arabia" },
+            "BWA": { code2: "bw", name: "Botswana" },
+            "SEN": { code2: "sn", name: "Senegal" },
+            "GHA": { code2: "gh", name: "Ghana" },
+            "TUN": { code2: "tn", name: "Tunisia" },
+            "MAR": { code2: "ma", name: "Morocco" },
+            "URY": { code2: "uy", name: "Uruguay" },
+            "ECU": { code2: "ec", name: "Ecuador" },
+            "BOL": { code2: "bo", name: "Bolivia" },
+            "PRY": { code2: "py", name: "Paraguay" },
+            "GTM": { code2: "gt", name: "Guatemala" },
+            "CRI": { code2: "cr", name: "Costa Rica" },
+            "PAN": { code2: "pa", name: "Panama" },
+            "DOM": { code2: "do", name: "Dominican Republic" },
+            "TWN": { code2: "tw", name: "Taiwan" },
+            "MNG": { code2: "mn", name: "Mongolia" },
+            "KAZ": { code2: "kz", name: "Kazakhstan" },
+            "KGZ": { code2: "kg", name: "Kyrgyzstan" },
+            "BTN": { code2: "bt", name: "Bhutan" },
+            "BGD": { code2: "bd", name: "Bangladesh" },
+            "LKA": { code2: "lk", name: "Sri Lanka" },
+            "KHM": { code2: "kh", name: "Cambodia" }
+        };
+
+        // Game State
+        let availableCountries = []; // Will be populated based on what the map actually renders
+        let currentTarget = "";
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem("flagGuesserHighScore")) || 0;
+        let isInputLocked = false; // Prevent double-clicks
+
+        document.getElementById("high-score").innerText = highScore;
+
+        // D3 Map Setup
+        const container = document.getElementById("map-container");
+        let width = container.clientWidth;
+        let height = container.clientHeight;
+
+        const svg = d3.select("#map-container").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const g = svg.append("g");
+
+        // Use a mercator projection tailored to fit nicely
+        const projection = d3.geoMercator()
+            .scale(width / 6.5)
+            .translate([width / 2, height / 1.5]);
+        
+        const path = d3.geoPath().projection(projection);
+
+        // Helper to place text labels correctly (handling disjointed territories)
+        function getLabelTransform(d) {
+            const overrides = {
+                "USA": [-98.5, 39.0], "FRA": [2.2, 46.2], "CAN": [-95.0, 60.0],
+                "GBR": [-3.4, 55.3], "NZL": [174.0, -40.9], "RUS": [90.0, 60.0],
+                "ESP": [-3.7, 40.4], "PRT": [-8.2, 39.3], "ZAF": [25.0, -29.0]
+            };
+            if (overrides[d.id]) {
+                const proj = projection(overrides[d.id]);
+                return `translate(${proj[0]}, ${proj[1]})`;
+            }
+            const centroid = path.centroid(d);
+            if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
+                return `translate(${centroid})`;
+            }
+            return "translate(-1000,-1000)";
+        }
+
+        // Map Zoom Behavior
+        const zoom = d3.zoom()
+            .scaleExtent([1, 15])
+            .translateExtent([[-width, -height], [width * 2, height * 2]])
+            .on("zoom", (event) => {
+                g.attr('transform', event.transform);
+                // Dynamically adjust stroke width so borders don't get too thick when zooming
+                g.selectAll("path").attr("stroke-width", 0.5 / event.transform.k);
+                
+                // Adjust label size based on zoom scale
+                const newFontSize = Math.max(1.5, 4 / event.transform.k);
+                g.selectAll(".country-label").style("font-size", newFontSize + "px");
+            });
+        
+        svg.call(zoom);
+
+        // Fetch GeoJSON and Initialize
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(data) {
+            
+            // Only add countries to the game loop if they exist in BOTH our target list AND the map data
+            const mapCountryIDs = data.features.map(f => f.id);
+            availableCountries = Object.keys(geoGuessrCountries).filter(id => mapCountryIDs.includes(id));
+
+            g.selectAll("path")
+                .data(data.features)
+                .join("path")
+                .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable country")
+                .attr("d", path)
+                .attr("id", d => "country-" + d.id)
+                .on("click", handleCountryClick);
+
+            // Add country names to the map
+            g.selectAll("text")
+                .data(data.features.filter(d => availableCountries.includes(d.id)))
+                .join("text")
+                .attr("class", "country-label")
+                .attr("transform", d => getLabelTransform(d))
+                .text(d => geoGuessrCountries[d.id].name);
+            
+            // Hide loading overlay and start
+            document.getElementById("loading-overlay").style.display = "none";
+            startRound();
+
+        }).catch(err => {
+            console.error("Error loading map:", err);
+            document.getElementById("loading-overlay").innerHTML = "<h2 class='text-red-500 text-xl'>Error loading map data. Please check your connection and refresh.</h2>";
+        });
+
+        // Handle Window Resize
+        window.addEventListener("resize", () => {
+            width = container.clientWidth;
+            height = container.clientHeight;
+            svg.attr("width", width).attr("height", height);
+            // Re-center projection on resize
+            projection.translate([width / 2, height / 1.5]);
+            g.selectAll("path").attr("d", path);
+            g.selectAll(".country-label").attr("transform", d => getLabelTransform(d));
+        });
+
+        function startRound() {
+            isInputLocked = false;
+            
+            // Pick random country, ensuring we don't pick the same one twice in a row
+            let newTarget;
+            do {
+                const randomIndex = Math.floor(Math.random() * availableCountries.length);
+                newTarget = availableCountries[randomIndex];
+            } while (newTarget === currentTarget && availableCountries.length > 1);
+            
+            currentTarget = newTarget;
+            
+            // Fetch and set Flag
+            const flagData = geoGuessrCountries[currentTarget];
+            const flagImg = document.getElementById("flag-display");
+            const flagLoader = document.getElementById("flag-loader");
+            
+            flagImg.classList.add("hidden");
+            flagLoader.classList.remove("hidden");
+            
+            // Using standard high-res FlagCDN images
+            flagImg.src = `https://flagcdn.com/w320/${flagData.code2}.png`;
+        }
+
+        function handleCountryClick(event, d) {
+            // Ignore clicks if game is transitioning or if clicking unplayable area
+            if (isInputLocked || !availableCountries.includes(d.id)) return;
+            
+            isInputLocked = true;
+            const clickedCountry = d.id;
+            const clickedPath = d3.select(this);
+
+            if (clickedCountry === currentTarget) {
+                // Correct
+                score++;
+                updateScore(score);
+                
+                // Visual feedback (Stay Green)
+                clickedPath.classed("guessed-correctly", true);
+                
+                setTimeout(() => {
+                    startRound();
+                }, 400);
+
+            } else {
+                // Incorrect
+                clickedPath.classed("incorrect-flash", true);
+                
+                // Also highlight the correct answer so they can learn it
+                const correctPath = d3.select("#country-" + currentTarget);
+                correctPath.classed("correct-flash", true);
+
+                setTimeout(() => {
+                    showGameOver();
+                    clickedPath.classed("incorrect-flash", false);
+                    correctPath.classed("correct-flash", false);
+                }, 600);
+            }
+        }
+
+        function updateScore(newScore) {
+            document.getElementById("score").innerText = newScore;
+            
+            // Animate score bump
+            const scoreEl = document.getElementById("score");
+            scoreEl.style.transform = "scale(1.5)";
+            scoreEl.style.color = "#4ade80"; // green-400
+            
+            setTimeout(() => {
+                scoreEl.style.transform = "scale(1)";
+                scoreEl.style.color = "#60a5fa"; // blue-400
+            }, 200);
+
+            if (newScore > highScore) {
+                highScore = newScore;
+                localStorage.setItem("flagGuesserHighScore", highScore);
+                document.getElementById("high-score").innerText = highScore;
+            }
+        }
+
+        function showGameOver() {
+            document.getElementById("final-score").innerText = score;
+            document.getElementById("correct-answer-name").innerText = geoGuessrCountries[currentTarget].name;
+            document.getElementById("game-over-overlay").classList.remove("hidden");
+            document.getElementById("game-over-overlay").classList.add("flex");
+        }
+
+        function restartGame() {
+            score = 0;
+            document.getElementById("score").innerText = score;
+            
+            const overlay = document.getElementById("game-over-overlay");
+            overlay.classList.add("hidden");
+            overlay.classList.remove("flex");
+            
+            // Clear all highlights
+            d3.selectAll(".guessed-correctly").classed("guessed-correctly", false);
+            d3.selectAll(".correct-flash").classed("correct-flash", false);
+            d3.selectAll(".incorrect-flash").classed("incorrect-flash", false);
+            
+            // Reset map zoom smoothly
+            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+            
+            startRound();
+        }
+    </script>
+</body>
+</html>
