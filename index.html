@@ -3,72 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FlagGuessr | Global</title>
+    <title>FlagGuessr | Pro</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; background-color: #aad3df; touch-action: none; }
-        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; z-index: 1; }
+        #map-container { width: 100vw; height: 100vh; background-color: #aad3df; }
         
-        .country-label {
+        .map-label {
             background: transparent; border: none; box-shadow: none;
-            font-family: serif; font-weight: 700; font-size: 14px; color: #000;
-            text-shadow: 1px 1px 0px rgba(255,255,255,0.7), -1px -1px 0px rgba(255,255,255,0.7);
-            text-anchor: middle; pointer-events: none; opacity: 1;
-            transition: opacity 0.3s ease;
+            color: #374151; text-align: center; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .label-continent {
+            font-size: 16px; font-weight: 900; text-transform: uppercase;
+            letter-spacing: 0.4em; color: #1e293b; opacity: 0.5;
+        }
+
+        .label-country {
+            font-family: serif; font-size: 13px; font-weight: 700;
+            text-shadow: 1px 1px 0px white, -1px -1px 0px white;
         }
         
-        .hide-labels .country-label { opacity: 0 !important; }
+        .hidden-label { opacity: 0 !important; }
+        
         #game-ui { padding-top: env(safe-area-inset-top); }
+        .stat-box { 
+            background-color: #1e293b; border: 1px solid #334155; 
+            border-radius: 0.5rem; min-width: 65px; padding: 4px 8px;
+            display: flex; flex-direction: column; align-items: center;
+        }
         .flag-loading { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .leaflet-container { background: #aad3df !important; }
-
-        .stat-box {
-            background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-width: 65px; padding: 4px 8px;
-        }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
 
     <!-- Adaptive Top Menu -->
-    <div id="game-ui" class="fixed top-0 left-0 w-full bg-[#0f172a]/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-[2000] hidden flex items-center justify-between px-4 py-3">
+    <div id="game-ui" class="fixed top-0 left-0 w-full bg-[#0f172a]/95 border-b border-slate-700 z-[2000] hidden flex items-center justify-between px-4 py-3">
         <div class="flex items-center gap-2">
             <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-lg">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </button>
             <div class="stat-box">
                 <span class="text-[10px] text-slate-400 font-bold uppercase">Score</span>
-                <div class="flex items-baseline gap-1">
-                    <span id="score" class="text-xl font-black text-blue-400">0</span>
-                    <span class="text-xs text-slate-500">/ <span id="total-countries">0</span></span>
-                </div>
-            </div>
-            <div class="stat-box hidden sm:flex">
-                <span class="text-[10px] text-slate-400 font-bold uppercase">Mode</span>
-                <span id="current-mode-display" class="text-xs font-bold text-amber-400 mt-0.5">Duel</span>
+                <span id="score" class="text-xl font-black text-blue-400">0</span>
             </div>
         </div>
-        
-        <div class="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
-            <div class="h-16 w-24 md:h-20 md:w-32 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center">
+
+        <div class="absolute left-1/2 -translate-x-1/2">
+            <div class="h-14 w-24 md:h-16 md:w-32 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-xl">
                 <div id="flag-loader" class="text-slate-500 text-xs flag-loading hidden">...</div>
                 <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden'); document.getElementById('flag-loader').classList.add('hidden');">
             </div>
         </div>
 
-        <div class="hidden lg:block text-right text-[11px] text-slate-400">
-            <p>Scroll to <span class="text-slate-200 font-semibold">Zoom</span></p>
-            <p>Drag to <span class="text-slate-200 font-semibold">Pan</span></p>
+        <div class="stat-box">
+            <span class="text-[10px] text-slate-400 font-bold uppercase">Mode</span>
+            <span id="current-mode-display" class="text-xs font-bold text-amber-400 mt-0.5">...</span>
         </div>
     </div>
 
@@ -76,9 +75,9 @@
 
     <!-- Main Menu -->
     <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900/95 z-[3000] flex flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 md:p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-lg w-full">
+        <div class="bg-slate-800 p-8 md:p-10 rounded-3xl border border-slate-600 shadow-2xl text-center max-w-sm w-full">
             <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">FlagGuessr</h1>
-            <div id="db-status" class="text-[10px] font-bold mb-8 text-amber-400 italic">Initializing...</div>
+            <div id="db-status" class="text-[10px] font-bold mb-8 text-amber-400 italic tracking-widest">CONNECTING...</div>
             
             <div id="menu-buttons" class="space-y-4 mb-8 opacity-50 pointer-events-none transition-opacity duration-500">
                 <button onclick="startGame('duel')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg">Duel Practice</button>
@@ -88,187 +87,134 @@
         </div>
     </div>
 
-    <!-- Game Over -->
-    <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-[4000] hidden flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 text-center max-w-md w-full">
-            <h1 class="text-3xl font-black text-red-500 mb-2">Incorrect!</h1>
-            <p class="text-slate-300 mb-6">That was <span id="correct-answer-name" class="font-bold text-blue-400">Country</span></p>
-            <div class="text-5xl font-black text-white mb-8" id="final-score-val">0</div>
-            <div id="score-submit-section" class="bg-slate-700/50 p-4 rounded-xl mb-6">
-                <div class="flex gap-2">
-                    <input type="text" id="player-name" placeholder="Name" class="flex-1 bg-slate-900 border border-slate-600 p-2 rounded text-sm text-white outline-none">
-                    <button id="save-score-btn" onclick="saveScore()" class="bg-amber-500 text-slate-900 font-bold px-4 rounded">Save</button>
-                </div>
-                <p id="save-msg" class="text-[10px] font-bold mt-2 hidden"></p>
-            </div>
-            <button onclick="location.reload()" class="w-full bg-blue-600 py-3 rounded-xl font-bold">Main Menu</button>
-        </div>
-    </div>
-
-    <!-- Leaderboard -->
-    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-[5000] hidden flex-col items-center justify-center p-4">
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900/95 z-[5000] hidden flex flex-col items-center justify-center p-4">
         <div class="bg-slate-800 p-8 rounded-2xl border border-slate-600 max-w-lg w-full flex flex-col max-h-[80vh]">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black">Global High Scores</h2>
                 <button onclick="document.getElementById('leaderboard-modal').classList.add('hidden')" class="text-slate-400 text-2xl">✖</button>
             </div>
             <div class="overflow-y-auto flex-1">
-                <table class="w-full text-left">
-                    <tbody id="leaderboard-body"></tbody>
-                </table>
+                <table class="w-full text-left"><tbody id="leaderboard-body"></tbody></table>
             </div>
         </div>
     </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyCmVeROPkTPAQWP7Wp9rMCibRNDrVZdYN8",
-            authDomain: "flagguessrneo.firebaseapp.com",
-            projectId: "flagguessrneo",
-            storageBucket: "flagguessrneo.firebasestorage.app",
-            messagingSenderId: "272364816723",
-            appId: "1:272364816723:web:8989e40751291655eb39a6",
-            measurementId: "G-1DRQXSEEJZ"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyCmVeROPkTPAQWP7Wp9rMCibRNDrVZdYN8", authDomain: "flagguessrneo.firebaseapp.com", projectId: "flagguessrneo", storageBucket: "flagguessrneo.firebasestorage.app", messagingSenderId: "272364816723", appId: "1:272364816723:web:8989e40751291655eb39a6" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-        let db = null;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            document.getElementById("db-status").innerText = "Database: Connected 🟢";
-            document.getElementById("db-status").className = "text-[10px] font-bold mb-8 text-green-400";
-        } catch (e) {
-            document.getElementById("db-status").innerText = "Database: Offline Mode 🟡";
-        }
+        const continentMarkers = [
+            { name: "Europe", pos: [50, 15] }, { name: "Africa", pos: [5, 20] }, 
+            { name: "Asia", pos: [35, 90] }, { name: "North America", pos: [45, -100] }, 
+            { name: "South America", pos: [-20, -60] }, { name: "Oceania", pos: [-25, 140] }
+        ];
 
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        let audioCtx;
-        function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
-        function playTone(f, t, d, v, s=null) { if(!audioCtx)return; const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type=t; o.connect(g); g.connect(audioCtx.destination); const n=audioCtx.currentTime; o.frequency.setValueAtTime(f,n); if(s)o.frequency.exponentialRampToValueAtTime(s,n+d); g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(v,n+0.05); g.gain.exponentialRampToValueAtTime(0.01,n+d); o.start(n); o.stop(n+d); }
-        function playCorrectSound() { initAudio(); playTone(523, 'sine', 0.1, 0.2); setTimeout(()=>playTone(783, 'sine', 0.3, 0.2), 80); }
-        function playIncorrectSound() { initAudio(); playTone(250, 'triangle', 0.3, 0.3, 100); }
+        const duelIDs = ["USA", "CAN", "MEX", "BRA", "ARG", "COL", "PER", "CHL", "GBR", "FRA", "DEU", "ITA", "ESP", "SWE", "NOR", "FIN", "POL", "RUS", "ZAF", "KEN", "NGA", "AUS", "NZL", "JPN", "KOR", "IND", "IDN", "THA", "MYS", "PHL", "VNM", "TUR", "EGY", "ISL", "IRL", "PRT", "CHE", "AUT", "CZE", "SVK", "HUN", "ROU", "BGR", "GRC", "HRV", "SRB", "UKR", "ARE", "ISR", "SAU", "BWA", "SEN", "GHA", "TUN", "MAR", "URY", "ECU", "BOL", "PRY", "GTM", "CRI", "PAN", "DOM", "TWN", "MNG", "KAZ", "KGZ", "BTN", "BGD", "LKA", "KHM", "ALB", "MNE", "BIH", "MKD", "SVN", "BEL", "NLD", "DNK", "EST", "LVA", "LTU", "LUX", "SGP"];
+        const countryCodes = { "USA": "us", "CAN": "ca", "MEX": "mx", "BRA": "br", "ARG": "ar", "COL": "co", "PER": "pe", "CHL": "cl", "GBR": "gb", "FRA": "fr", "DEU": "de", "ITA": "it", "ESP": "es", "SWE": "se", "NOR": "no", "FIN": "fi", "POL": "pl", "RUS": "ru", "ZAF": "za", "KEN": "ke", "NGA": "ng", "AUS": "au", "NZL": "nz", "JPN": "jp", "KOR": "kr", "IND": "in", "IDN": "id", "THA": "th", "MYS": "my", "PHL": "ph", "VNM": "vn", "TUR": "tr", "EGY": "eg", "ISL": "is", "IRL": "ie", "PRT": "pt", "CHE": "ch", "AUT": "at", "CZE": "cz", "SVK": "sk", "HUN": "hu", "ROU": "ro", "BGR": "bg", "GRC": "gr", "HRV": "hr", "SRB": "rs", "UKR": "ua", "ARE": "ae", "ISR": "il", "SAU": "sa", "BWA": "bw", "SEN": "sn", "GHA": "gh", "TUN": "tn", "MAR": "ma", "URY": "uy", "ECU": "ec", "BOL": "bo", "PRY": "py", "GTM": "gt", "CRI": "cr", "PAN": "pa", "DOM": "do", "TWN": "tw", "MNG": "mn", "KAZ": "kz", "KGZ": "kg", "BTN": "bt", "BGD": "bd", "LKA": "lk", "KHM": "kh", "ALB": "al", "MNE": "me", "BIH": "ba", "MKD": "mk", "SVN": "si", "BEL": "be", "NLD": "nl", "DNK": "dk", "EST": "ee", "LVA": "lv", "LTU": "lt", "LUX": "lu", "SGP": "sg", "GRL": "gl", "CUB": "cu", "PRK": "kp" };
 
-        const duelCountries = { "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia" }, "MKD": { code2: "mk", name: "N. Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "SGP": { code2: "sg", name: "Singapore" } };
-        const arbitraryCountries = { ...duelCountries, "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "ATA": { code2: "aq", name: "Antarctica" }, "CUB": { code2: "cu", name: "Cuba" }, "PRK": { code2: "kp", name: "North Korea" } };
-        const labelOverrides = { "USA": [39.0, -98.5], "CAN": [56.0, -100.0], "GBR": [54.3, -2.4], "NOR": [61.0, 10.0], "HRV": [45.1, 15.2], "GRC": [38.5, 22.5], "RUS": [62.0, 95.0], "CHL": [-33.0, -71.0], "IDN": [-1.0, 115.0] };
-
-        let map, geojsonLayer, labelsLayer, activeDict, availableIDs, unplayed, currentTarget, scoreCount, isLocked, geoData, polygons = {};
-
-        function unlockButtons() {
-            document.getElementById("menu-buttons").classList.remove("opacity-50", "pointer-events-none");
-            document.getElementById("db-status").innerText += " (Ready)";
-        }
+        let map, geoData, currentTarget, unplayed, activeList, labelMarkers = [], polygons = {}, isLocked = false, scoreCount = 0;
 
         function initMap() {
             map = L.map('map-container', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 12, zoomControl: false });
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
             
-            map.on('zoomend', () => map.getZoom() > 10 ? document.getElementById('map-container').classList.add('hide-labels') : document.getElementById('map-container').classList.remove('hide-labels'));
-            
-            // Force unlock after 3 seconds in case of slow internet
-            setTimeout(unlockButtons, 3000);
+            map.on('zoomend', updateLabelVisibility);
 
             fetch("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
-                .then(r => r.json())
-                .then(d => {
+                .then(r => r.json()).then(d => {
                     geoData = d;
-                    unlockButtons();
-                }).catch(err => console.warn("Map data load failed, using local mode fallback."));
+                    document.getElementById("menu-buttons").classList.remove("opacity-50", "pointer-events-none");
+                    document.getElementById("db-status").innerText = "CONNECTED 🟢";
+                    document.getElementById("db-status").className = "text-[10px] font-bold mb-8 text-green-400 italic tracking-widest";
+                });
         }
 
         function startGame(mode) {
-            initAudio();
-            activeDict = (mode === 'duel') ? duelCountries : arbitraryCountries;
-            availableIDs = Object.keys(activeDict).filter(id => geoData && geoData.features.some(f => f.id === id));
-            
+            activeList = mode === 'duel' ? duelIDs : Object.keys(countryCodes);
             document.getElementById("main-menu-overlay").classList.add("hidden");
-            document.getElementById("game-ui").classList.remove("hidden");
-            document.getElementById("game-ui").classList.add("flex");
-            document.getElementById("current-mode-display").innerText = mode === 'duel' ? "Duel" : "Arbitrary";
+            document.getElementById("game-ui").classList.remove("hidden").classList.add("flex");
+            document.getElementById("current-mode-display").innerText = mode === 'duel' ? "DUEL" : "ALL";
             
+            unplayed = [...activeList];
             scoreCount = 0;
             document.getElementById("score").innerText = 0;
-            document.getElementById("total-countries").innerText = availableIDs.length;
             
-            unplayed = [...availableIDs];
-            renderMap();
+            renderWorld();
             startRound();
         }
 
-        function renderMap() {
-            if (geojsonLayer) map.removeLayer(geojsonLayer);
-            if (labelsLayer) map.removeLayer(labelsLayer);
-            if (!geoData) return;
+        function renderWorld() {
+            if (map.mainLayer) map.removeLayer(map.mainLayer);
+            labelMarkers.forEach(m => map.removeLayer(m));
+            labelMarkers = [];
 
-            labelsLayer = L.layerGroup().addTo(map);
-            geojsonLayer = L.geoJSON(geoData, {
-                filter: f => availableIDs.includes(f.id),
-                style: { color: 'rgba(0,0,0,0.15)', weight: 1.5, fillColor: 'transparent', fillOpacity: 0.01 },
+            map.mainLayer = L.geoJSON(geoData, {
+                style: (f) => ({
+                    fillColor: activeList.includes(f.id) ? '#94c973' : '#cbd5e1',
+                    fillOpacity: activeList.includes(f.id) ? 0.7 : 0.2,
+                    color: '#475569', weight: 1
+                }),
                 onEachFeature: (f, l) => {
                     polygons[f.id] = l;
                     l.on('click', () => handleGuess(f.id, l));
-                    const center = labelOverrides[f.id] || l.getBounds().getCenter();
-                    const labelIcon = L.divIcon({ className: 'country-label', html: activeDict[f.id].name, iconSize: [120, 20] });
-                    L.marker(center, { icon: labelIcon, interactive: false }).addTo(labelsLayer);
+                    
+                    if (activeList.includes(f.id)) {
+                        const m = L.marker(l.getBounds().getCenter(), {
+                            icon: L.divIcon({ className: 'map-label label-country', html: f.properties.name, iconSize: [120, 20] }),
+                            interactive: false
+                        });
+                        labelMarkers.push(m);
+                    }
                 }
             }).addTo(map);
+
+            continentMarkers.forEach(c => {
+                const m = L.marker(c.pos, {
+                    icon: L.divIcon({ className: 'map-label label-continent', html: c.name, iconSize: [200, 30] }),
+                    interactive: false
+                });
+                labelMarkers.push(m);
+            });
+            updateLabelVisibility();
+        }
+
+        function updateLabelVisibility() {
+            const z = map.getZoom();
+            labelMarkers.forEach(m => {
+                const isCont = m.options.icon.options.className.includes('continent');
+                if (z <= 3) {
+                    isCont ? m.addTo(map) : map.removeLayer(m);
+                } else if (z > 3 && z <= 9) {
+                    !isCont ? m.addTo(map) : map.removeLayer(m);
+                } else {
+                    map.removeLayer(m);
+                }
+            });
         }
 
         function startRound() {
             isLocked = false;
-            if (unplayed.length === 0) unplayed = [...availableIDs];
-            const idx = Math.floor(Math.random() * unplayed.length);
-            currentTarget = unplayed[idx];
-            unplayed.splice(idx, 1);
-            
-            document.getElementById("flag-display").classList.add("hidden");
             document.getElementById("flag-loader").classList.remove("hidden");
-            document.getElementById("flag-display").src = `https://flagcdn.com/w320/${activeDict[currentTarget].code2}.png`;
+            if (unplayed.length === 0) unplayed = [...activeList];
+            currentTarget = unplayed.splice(Math.floor(Math.random() * unplayed.length), 1)[0];
+            document.getElementById("flag-display").src = `https://flagcdn.com/w320/${countryCodes[currentTarget]}.png`;
         }
 
         function handleGuess(id, layer) {
-            if (isLocked) return;
+            if (isLocked || !activeList.includes(id)) return;
             isLocked = true;
             if (id === currentTarget) {
-                playCorrectSound();
                 scoreCount++;
                 document.getElementById("score").innerText = scoreCount;
-                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 0.4 });
+                layer.setStyle({ fillColor: '#22c55e', fillOpacity: 1 });
                 setTimeout(startRound, 400);
             } else {
-                playIncorrectSound();
-                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 0.5 });
-                if (polygons[currentTarget]) polygons[currentTarget].setStyle({ fillColor: '#22c55e', fillOpacity: 0.4 });
-                setTimeout(showGameOver, 800);
+                layer.setStyle({ fillColor: '#ef4444', fillOpacity: 1 });
+                polygons[currentTarget].setStyle({ fillColor: '#22c55e', fillOpacity: 1 });
+                setTimeout(() => location.reload(), 1500);
             }
-        }
-
-        function showGameOver() {
-            document.getElementById("final-score-val").innerText = scoreCount;
-            document.getElementById("correct-answer-name").innerText = activeDict[currentTarget].name;
-            document.getElementById("game-over-overlay").classList.remove("hidden");
-            document.getElementById("game-over-overlay").classList.add("flex");
-        }
-
-        async function saveScore() {
-            const n=document.getElementById("player-name").value.trim(); if(!n||!db)return;
-            try {
-                await db.collection("leaderboard").add({name:n,score:scoreCount,mode:document.getElementById("current-mode-display").innerText,date:Date.now()});
-                document.getElementById("save-msg").innerText="Saved!"; document.getElementById("save-msg").classList.remove("hidden");
-                document.getElementById("save-score-btn").disabled=true;
-            } catch(e) {}
-        }
-
-        async function showLeaderboard() {
-            document.getElementById("leaderboard-modal").classList.remove("hidden").classList.add("flex");
-            const tb=document.getElementById("leaderboard-body"); tb.innerHTML="<tr><td colspan='3' class='p-4 text-center'>Loading...</td></tr>";
-            if(!db) { tb.innerHTML="DB not connected"; return; }
-            const s=await db.collection("leaderboard").orderBy("score","desc").limit(10).get();
-            tb.innerHTML = s.docs.map((d,i)=>{
-                const e=d.data();
-                return `<tr class='border-b border-slate-700 hover:bg-slate-700/50'><td class='p-3 text-xs'>#${i+1}</td><td class='p-3 text-xs font-bold'>${e.name}</td><td class='p-3 text-xs text-right text-blue-400 font-black'>${e.score}</td></tr>`;
-            }).join('');
         }
 
         window.onload = initMap;
