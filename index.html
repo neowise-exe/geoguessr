@@ -86,57 +86,55 @@
         .country-label { pointer-events: none; user-select: none; text-anchor: middle; fill: #ffffff; font-family: sans-serif; font-weight: 800; paint-order: stroke; stroke: #000000; stroke-width: 0.6px; transition: opacity 0.2s ease; }
         .hidden-label { opacity: 0 !important; visibility: hidden; }
         
-        /* Mobile Bug Fixes */
+        /* DESKTOP UI */
+        #game-ui { display: none; }
+        @media (min-width: 769px) {
+            #game-ui { display: flex; flex-direction: row; justify-content: space-between; }
+            #nav-controls { order: 1; width: 33.333%; justify-content: flex-start; }
+            #flag-container { order: 2; width: 33.333%; display: flex; justify-content: center; }
+            #instructions { order: 3; width: 33.333%; }
+        }
+
+        /* MOBILE UI */
         @media (max-width: 768px) {
             #game-ui { 
-                padding: 0.5rem; 
-                flex-direction: row-reverse !important; /* Reorders: Flag Right, Streak Left */
+                display: flex;
+                padding: 0.4rem; 
+                flex-direction: row-reverse !important; 
                 justify-content: space-between !important;
             }
-            .ui-box { 
-                min-width: fit-content !important; 
-                width: auto !important;
-                padding-left: 0.75rem !important;
-                padding-right: 0.75rem !important;
-            }
-            .ui-text-main { 
-                font-size: 0.75rem !important; 
-                white-space: nowrap !important;
-            }
-            .flag-box { 
-                height: 3rem !important; 
-                width: 5rem !important; 
-                margin-left: auto !important; /* Forces flag to right */
-            }
-            #nav-controls {
-                width: fit-content !important;
-            }
+            #nav-controls { order: 2; width: auto; justify-content: flex-start; }
+            #flag-container { order: 1; width: auto; }
+            .ui-box { min-width: fit-content !important; padding: 0.25rem 0.6rem !important; }
+            .ui-text-main { font-size: 0.8rem !important; white-space: nowrap; }
+            .flag-box { height: 3.2rem !important; width: 5.5rem !important; }
             #instructions { display: none; }
         }
     </style>
 </head>
 <body class="text-white font-sans antialiased">
 
-    <!-- Top Bar Container -->
-    <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 hidden items-center px-2 md:px-6 py-2">
+    <div id="game-ui" class="fixed top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md shadow-lg border-b border-slate-700 z-10 items-center px-2 md:px-6 py-2">
         
-        <!-- Flag Section -->
-        <div class="flex justify-center md:w-1/3">
+        <!-- Controls (Left on Desktop, Left on Mobile) -->
+        <div id="nav-controls" class="flex items-center gap-2 md:gap-3">
+            <button onclick="location.reload()" class="bg-slate-700 p-2 rounded-lg text-white hover:bg-slate-600 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </button>
+            <div class="ui-box bg-slate-800 rounded-lg px-3 py-1 border border-slate-600 text-center">
+                <span id="score-display" class="ui-text-main text-sm md:text-base font-black text-blue-400 uppercase">STREAK: 0/0</span>
+            </div>
+        </div>
+
+        <!-- Flag (Center on Desktop, Right on Mobile) -->
+        <div id="flag-container">
             <div class="flag-box h-12 md:h-16 w-20 md:w-28 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-xl">
                 <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden')">
             </div>
         </div>
 
-        <!-- Controls/Streak Section -->
-        <div id="nav-controls" class="flex items-center gap-1 md:gap-3 md:w-1/3">
-            <button onclick="location.reload()" class="bg-slate-700 p-2 rounded-lg text-white hover:bg-slate-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg></button>
-            <div class="ui-box bg-slate-800 rounded-lg px-3 py-1 border border-slate-600 text-center min-w-[90px]">
-                <span id="score-display" class="ui-text-main text-sm md:text-base font-black text-blue-400 whitespace-nowrap uppercase">STREAK: 0/0</span>
-            </div>
-        </div>
-
-        <!-- Instructions (Hidden on Mobile) -->
-        <div id="instructions" class="w-1/3 text-right text-[9px] text-slate-400 uppercase font-bold tracking-tighter">
+        <!-- Instructions (Desktop Only) -->
+        <div id="instructions" class="text-right text-[9px] text-slate-400 uppercase font-bold tracking-tighter">
             <p>Scroll: <span class="text-slate-200">Zoom</span></p>
             <p>Drag: <span class="text-slate-200">Pan</span></p>
         </div>
@@ -145,7 +143,7 @@
     <div id="map-container"></div>
 
     <!-- Menus -->
-    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center p-6 text-center">
         <div class="flex flex-col items-center mb-12">
             <h1 class="text-7xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-emerald-400 py-4 tracking-tighter">FlagGuessr</h1>
             <p class="text-slate-500 font-bold tracking-[0.4em] uppercase text-[10px] md:text-xs">Made by Neowise</p>
@@ -169,7 +167,7 @@
     </div>
 
     <div id="leaderboard-modal" class="fixed inset-0 bg-slate-900 z-50 hidden flex-col items-center justify-center p-4">
-        <div class="bg-slate-800 p-6 rounded-3xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col border border-slate-700 shadow-2xl">
+        <div class="bg-slate-800 p-6 rounded-3xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col border border-slate-700">
             <div class="flex justify-between items-center mb-6"><h3 class="font-black text-2xl tracking-tight">LEADERBOARD</h3><button onclick="closeLeaderboard()" class="text-2xl font-black hover:text-red-500 transition">✕</button></div>
             <div class="overflow-y-auto pr-2"><table class="w-full text-left"><tbody id="leaderboard-body"></tbody></table></div>
         </div>
@@ -225,18 +223,7 @@
         svg.call(zoom);
 
         function getLabelTransform(d) {
-            const overrides = { 
-                "AND": [1.52, 42.5], 
-                "LUX": [6.13, 49.61], 
-                "FRA": [2.4, 46.5], 
-                "USA": [-98.5, 39.0], 
-                "CAN": [-100.0, 60.0], 
-                "RUS": [90.0, 60.0], 
-                "NOR": [9.5, 62.5], 
-                "HRV": [16.2, 45.4], 
-                "JPN": [138.0, 36.5], 
-                "CHL": [-71.5, -30.6] 
-            };
+            const overrides = { "AND": [1.52, 42.5], "LUX": [6.13, 49.61], "FRA": [2.4, 46.5], "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "RUS": [90.0, 60.0], "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5], "CHL": [-71.5, -30.6] };
             if (overrides[d.id]) { const proj = projection(overrides[d.id]); return `translate(${proj[0]}, ${proj[1]})`; }
             const centroid = path.centroid(d);
             return !isNaN(centroid[0]) ? `translate(${centroid})` : "translate(-1000,-1000)";
@@ -252,14 +239,12 @@
             g.selectAll("*").remove();
             const mapCountryIDs = mapDataFeatures.map(f => f.id);
             availableCountries = Object.keys(dict).filter(id => mapCountryIDs.includes(id));
-            
             g.selectAll("path").data(mapDataFeatures).join("path")
                 .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable")
                 .attr("d", path).attr("id", d => "country-" + d.id)
                 .on("click", (event, d) => {
                     if (availableCountries.includes(d.id)) handleCountryClick(event, d);
                 });
-
             g.selectAll(".country-label").data(mapDataFeatures.filter(d => availableCountries.includes(d.id))).join("text")
                 .attr("class", "country-label hidden-label").attr("id", d => "label-" + d.id).attr("transform", d => getLabelTransform(d)).text(d => dict[d.id].name);
         }
@@ -289,15 +274,12 @@
         function handleCountryClick(event, d) {
             if (isInputLocked) return;
             if (d3.select("#country-" + d.id).classed("guessed-correctly")) return;
-
             isInputLocked = true;
             if (d.id === currentTarget) {
                 window.score++; 
                 document.getElementById("score-display").innerText = `STREAK: ${window.score}/${availableCountries.length}`;
                 d3.select("#country-" + d.id).classed("guessed-correctly", true);
-                setTimeout(() => {
-                    startRound();
-                }, 400);
+                setTimeout(() => { startRound(); }, 400);
             } else {
                 d3.select("#country-" + d.id).classed("incorrect-flash", true);
                 d3.select("#country-" + currentTarget).classed("correct-flash", true);
@@ -311,9 +293,7 @@
             document.getElementById("game-over-overlay").classList.add("flex");
         }
 
-        function restartGame() {
-            location.reload();
-        }
+        function restartGame() { location.reload(); }
     </script>
 </body>
 </html>
