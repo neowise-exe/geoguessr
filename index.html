@@ -119,23 +119,24 @@
 
     <div id="map-container"></div>
 
-    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center p-6 text-center">
-        <div class="pb-2">
-            <h1 class="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-emerald-400 leading-tight tracking-tighter">FlagGuessr</h1>
-            <p class="text-slate-500 font-bold tracking-[0.3em] uppercase text-xs mt-[-10px]">Made by Neowise</p>
+    <!-- Redesigned Main Menu -->
+    <div id="main-menu-overlay" class="fixed inset-0 bg-slate-900 z-40 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+        <div class="flex flex-col items-center mb-12">
+            <h1 class="text-7xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-emerald-400 py-4 tracking-tighter">FlagGuessr</h1>
+            <p class="text-slate-500 font-bold tracking-[0.4em] uppercase text-[10px] md:text-xs">Made by Neowise</p>
         </div>
         
-        <div class="flex flex-col gap-4 w-full max-w-xs mt-10">
-            <button onclick="startGame('duel')" class="bg-blue-600 hover:bg-blue-500 p-4 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95">DUEL PRACTICE</button>
-            <button onclick="startGame('arbitrary')" class="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95">ARBITRARY WORLD</button>
+        <div class="flex flex-col gap-6 w-full max-w-xs md:max-w-sm">
+            <button onclick="startGame('duel')" class="bg-blue-600 hover:bg-blue-500 p-5 rounded-2xl font-black text-2xl shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all hover:-translate-y-1 active:scale-95">DUEL PRACTICE</button>
+            <button onclick="startGame('arbitrary')" class="bg-emerald-600 hover:bg-emerald-500 p-5 rounded-2xl font-black text-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:-translate-y-1 active:scale-95">ARBITRARY WORLD</button>
         </div>
-        <button onclick="showLeaderboard()" class="mt-10 text-slate-400 hover:text-white font-bold uppercase tracking-widest text-sm underline decoration-slate-700 underline-offset-8">View Leaderboard</button>
+        <button onclick="showLeaderboard()" class="mt-14 text-slate-400 hover:text-white font-bold uppercase tracking-widest text-sm transition-colors">View Leaderboard</button>
     </div>
 
     <div id="game-over-overlay" class="fixed inset-0 bg-slate-900/95 z-40 hidden flex-col items-center justify-center p-4">
         <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm text-center border border-slate-700 shadow-2xl">
             <h2 class="text-3xl font-black text-red-500 mb-2">WRONG!</h2>
-            <p class="text-slate-300 mb-6 font-medium">It was <span id="correct-answer-name" class="text-blue-400 font-black text-xl block"></span></p>
+            <p class="text-slate-400 mb-6 font-medium">It was <span id="correct-answer-name" class="text-blue-400 font-black text-xl block"></span></p>
             <input type="text" id="username-input" placeholder="ENTER NAME" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl mb-4 text-center font-bold text-white focus:border-blue-500 outline-none">
             <button id="save-btn" onclick="saveScore()" class="w-full bg-emerald-600 p-3 rounded-xl font-black mb-4 hover:bg-emerald-500 transition-colors">SUBMIT SCORE</button>
             <button onclick="restartGame()" class="w-full bg-slate-700 p-3 rounded-xl font-black hover:bg-slate-600 transition-colors">TRY AGAIN</button>
@@ -154,8 +155,8 @@
     </div>
 
     <script>
-        const duelCountries = { "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" }, "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" }, "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" }, "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" } };
-        const arbitraryAdditions = { "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
+        const duelCountries = { "AND": { code2: "ad", name: "Andorra" }, "USA": { code2: "us", name: "United States" }, "CAN": { code2: "ca", name: "Canada" }, "MEX": { code2: "mx", name: "Mexico" }, "BRA": { code2: "br", name: "Brazil" }, "ARG": { code2: "ar", name: "Argentina" }, "COL": { code2: "co", name: "Colombia" }, "PER": { code2: "pe", name: "Peru" }, "CHL": { code2: "cl", name: "Chile" }, "GBR": { code2: "gb", name: "United Kingdom" }, "FRA": { code2: "fr", name: "France" }, "DEU": { code2: "de", name: "Germany" }, "ITA": { code2: "it", name: "Italy" }, "ESP": { code2: "es", name: "Spain" }, "SWE": { code2: "se", name: "Sweden" }, "NOR": { code2: "no", name: "Norway" }, "FIN": { code2: "fi", name: "Finland" }, "POL": { code2: "pl", name: "Poland" }, "RUS": { code2: "ru", name: "Russia" }, "ZAF": { code2: "za", name: "South Africa" }, "KEN": { code2: "ke", name: "Kenya" }, "NGA": { code2: "ng", name: "Nigeria" }, "AUS": { code2: "au", name: "Australia" }, "NZL": { code2: "nz", name: "New Zealand" }, "JPN": { code2: "jp", name: "Japan" }, "KOR": { code2: "kr", name: "South Korea" }, "IND": { code2: "in", name: "India" }, "IDN": { code2: "id", name: "Indonesia" }, "THA": { code2: "th", name: "Thailand" }, "MYS": { code2: "my", name: "Malaysia" }, "PHL": { code2: "ph", name: "Philippines" }, "VNM": { code2: "vn", name: "Vietnam" }, "TUR": { code2: "tr", name: "Turkey" }, "EGY": { code2: "eg", name: "Egypt" }, "ISL": { code2: "is", name: "Iceland" }, "IRL": { code2: "ie", name: "Ireland" }, "PRT": { code2: "pt", name: "Portugal" }, "CHE": { code2: "ch", name: "Switzerland" }, "AUT": { code2: "at", name: "Austria" }, "CZE": { code2: "cz", name: "Czechia" }, "SVK": { code2: "sk", name: "Slovakia" }, "HUN": { code2: "hu", name: "Hungary" }, "ROU": { code2: "ro", name: "Romania" }, "BGR": { code2: "bg", name: "Bulgaria" }, "GRC": { code2: "gr", name: "Greece" }, "HRV": { code2: "hr", name: "Croatia" }, "SRB": { code2: "rs", name: "Serbia" }, "UKR": { code2: "ua", name: "Ukraine" }, "ARE": { code2: "ae", name: "United Arab Emirates" }, "ISR": { code2: "il", name: "Israel" }, "SAU": { code2: "sa", name: "Saudi Arabia" }, "BWA": { code2: "bw", name: "Botswana" }, "SEN": { code2: "sn", name: "Senegal" }, "GHA": { code2: "gh", name: "Ghana" }, "TUN": { code2: "tn", name: "Tunisia" }, "MAR": { code2: "ma", name: "Morocco" }, "URY": { code2: "uy", name: "Uruguay" }, "ECU": { code2: "ec", name: "Ecuador" }, "BOL": { code2: "bo", name: "Bolivia" }, "PRY": { code2: "py", name: "Paraguay" }, "GTM": { code2: "gt", name: "Guatemala" }, "CRI": { code2: "cr", name: "Costa Rica" }, "PAN": { code2: "pa", name: "Panama" }, "DOM": { code2: "do", name: "Dominican Republic" }, "TWN": { code2: "tw", name: "Taiwan" }, "MNG": { code2: "mn", name: "Mongolia" }, "KAZ": { code2: "kz", name: "Kazakhstan" }, "KGZ": { code2: "kg", name: "Kyrgyzstan" }, "BTN": { code2: "bt", name: "Bhutan" }, "BGD": { code2: "bd", name: "Bangladesh" }, "LKA": { code2: "lk", name: "Sri Lanka" }, "KHM": { code2: "kh", name: "Cambodia" }, "ALB": { code2: "al", name: "Albania" }, "MNE": { code2: "me", name: "Montenegro" }, "BIH": { code2: "ba", name: "Bosnia and Herzegovina" }, "MKD": { code2: "mk", name: "North Macedonia" }, "SVN": { code2: "si", name: "Slovenia" }, "BEL": { code2: "be", name: "Belgium" }, "NLD": { code2: "nl", name: "Netherlands" }, "DNK": { code2: "dk", name: "Denmark" }, "EST": { code2: "ee", name: "Estonia" }, "LVA": { code2: "lv", name: "Latvia" }, "LTU": { code2: "lt", name: "Lithuania" }, "LUX": { code2: "lu", name: "Luxembourg" }, "RWA": { code2: "rw", name: "Rwanda" }, "UGA": { code2: "ug", name: "Uganda" }, "SWZ": { code2: "sz", name: "Eswatini" }, "LSO": { code2: "ls", name: "Lesotho" }, "SGP": { code2: "sg", name: "Singapore" } };
+        const arbitraryAdditions = { "LUX": { code2: "lu", name: "Luxembourg" }, "GRL": { code2: "gl", name: "Greenland" }, "PRI": { code2: "pr", name: "Puerto Rico" }, "NCL": { code2: "nc", name: "New Caledonia" }, "GUF": { code2: "gf", name: "French Guiana" }, "FRO": { code2: "fo", name: "Faroe Islands" }, "ATA": { code2: "aq", name: "Antarctica" }, "FLK": { code2: "fk", name: "Falkland Islands" }, "CUB": { code2: "cu", name: "Cuba" }, "JAM": { code2: "jm", name: "Jamaica" }, "HTI": { code2: "ht", name: "Haiti" }, "PNG": { code2: "pg", name: "Papua New Guinea" }, "FJI": { code2: "fj", name: "Fiji" }, "SLB": { code2: "sb", name: "Solomon Islands" }, "VUT": { code2: "vu", name: "Vanuatu" }, "MDG": { code2: "mg", name: "Madagascar" }, "PRK": { code2: "kp", name: "North Korea" }, "IRQ": { code2: "iq", name: "Iraq" }, "IRN": { code2: "ir", name: "Iran" }, "AFG": { code2: "af", name: "Afghanistan" }, "SYR": { code2: "sy", name: "Syria" }, "YEM": { code2: "ye", name: "Yemen" }, "SOM": { code2: "so", name: "Somalia" }, "SDN": { code2: "sd", name: "Sudan" }, "COD": { code2: "cd", name: "DR Congo" }, "AGO": { code2: "ao", name: "Angola" }, "ZWE": { code2: "zw", name: "Zimbabwe" }, "NAM": { code2: "na", name: "Namibia" }, "MMR": { code2: "mm", name: "Myanmar" }, "NPL": { code2: "np", name: "Nepal" } };
         const arbitraryCountries = { ...duelCountries, ...arbitraryAdditions };
 
         window.score = 0;
@@ -187,7 +188,12 @@
                         if(["NOR", "CHL", "VNM"].includes(d.id)) rotation = -65;
                         if(d.id === "JPN") rotation = -45;
                         node.attr("transform", `${getLabelTransform(d)} rotate(${rotation})`);
-                        if (k < 3.2 || labelLen > (Math.max((bbox[1][0]-bbox[0][0]), (bbox[1][1]-bbox[0][1])) * k * 1.4)) 
+                        
+                        // Small country override: allow Luxembourg, Andorra, Bosnia, Macedonia to show easier
+                        const isSmall = ["LUX", "AND", "BIH", "MKD", "MNE", "SVN"].includes(d.id);
+                        const threshold = isSmall ? 2.5 : 1.4;
+
+                        if (k < 3.2 || labelLen > (Math.max((bbox[1][0]-bbox[0][0]), (bbox[1][1]-bbox[0][1])) * k * threshold)) 
                             node.classed("hidden-label", true); else node.classed("hidden-label", false);
                     });
             });
@@ -195,7 +201,7 @@
         svg.call(zoom);
 
         function getLabelTransform(d) {
-            const overrides = { "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "RUS": [90.0, 60.0], "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5], "CHL": [-71.5, -30.6] };
+            const overrides = { "AND": [1.5, 42.5], "LUX": [6.1, 49.6], "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "RUS": [90.0, 60.0], "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5], "CHL": [-71.5, -30.6] };
             if (overrides[d.id]) { const proj = projection(overrides[d.id]); return `translate(${proj[0]}, ${proj[1]})`; }
             const centroid = path.centroid(d);
             return !isNaN(centroid[0]) ? `translate(${centroid})` : "translate(-1000,-1000)";
@@ -247,17 +253,13 @@
 
         function handleCountryClick(event, d) {
             if (isInputLocked) return;
-            // Check if this country was already correctly guessed
             if (d3.select("#country-" + d.id).classed("guessed-correctly")) return;
 
             isInputLocked = true;
             if (d.id === currentTarget) {
                 window.score++; 
                 document.getElementById("score-display").innerText = `STREAK: ${window.score}/${availableCountries.length}`;
-                
-                // Add the class and DO NOT remove it
                 d3.select("#country-" + d.id).classed("guessed-correctly", true);
-                
                 setTimeout(() => {
                     startRound();
                 }, 400);
