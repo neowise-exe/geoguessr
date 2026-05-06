@@ -26,9 +26,17 @@
 
         window.saveScore = async function(isWin = false) {
             const inputId = isWin ? "win-username-input" : "username-input";
+            const btnId = isWin ? "win-save-btn" : "save-btn";
             const username = document.getElementById(inputId).value.trim();
+            
             if (!username) return alert("Please enter a name!");
             
+            const btn = document.getElementById(btnId);
+            if(btn) {
+                btn.disabled = true;
+                btn.innerText = "SAVING...";
+            }
+
             try {
                 const q = query(collection(db, "leaderboard"), where("name", "==", username));
                 const querySnapshot = await getDocs(q);
@@ -49,7 +57,13 @@
                     alert("Record logged!");
                 }
                 location.reload();
-            } catch (e) { alert("Error saving score."); }
+            } catch (e) { 
+                alert("Error saving score."); 
+                if(btn) {
+                    btn.disabled = false;
+                    btn.innerText = "SUBMIT SCORE";
+                }
+            }
         };
 
         window.showLeaderboard = async function() {
@@ -99,7 +113,7 @@
             #instructions { display: none; }
         }
 
-        .confetti { position: absolute; pointer-events: none; animation: fall linear forwards; }
+        .confetti { position: absolute; pointer-events: none; animation: fall linear forwards; z-index: 100; }
         @keyframes fall { to { transform: translateY(100vh) rotate(360deg); } }
     </style>
 </head>
@@ -114,11 +128,17 @@
                 <span id="score-display" class="ui-text-main text-sm md:text-base font-black text-blue-400 uppercase">STREAK: 0/0</span>
             </div>
         </div>
-        <div id="flag-container">
+        
+        <!-- FLAG CONTAINER WITH NEW REFRESH BUTTON -->
+        <div id="flag-container" class="flex items-center gap-2">
+            <button onclick="refreshFlag()" class="bg-slate-700 p-2 rounded-lg text-white hover:bg-slate-600 transition shadow-lg" title="Reload Flag">
+                <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
             <div class="flag-box h-12 md:h-16 w-20 md:w-28 bg-slate-800 rounded border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-xl">
                 <img id="flag-display" src="" class="w-full h-full object-cover hidden" onload="this.classList.remove('hidden')">
             </div>
         </div>
+
         <div id="instructions" class="text-right text-[9px] text-slate-400 uppercase font-bold tracking-tighter">
             <p>Scroll: <span class="text-slate-200">Zoom</span></p>
             <p>Drag: <span class="text-slate-200">Pan</span></p>
@@ -127,16 +147,17 @@
 
     <div id="map-container"></div>
 
-    <!-- Win Screen -->
+    <!-- UPDATED WIN SCREEN -->
     <div id="win-overlay" class="fixed inset-0 bg-slate-900/95 z-50 hidden flex-col items-center justify-center p-6 text-center">
         <div class="bg-slate-800 p-8 rounded-3xl border-4 border-emerald-500 shadow-2xl max-w-lg w-full">
             <h1 class="text-5xl font-black text-emerald-400 mb-4 animate-bounce">PERFECT!</h1>
-            <p class="text-slate-300 mb-6 font-bold uppercase tracking-widest">Mastered: <span id="win-mode-name" class="text-blue-400"></span></p>
+            <p class="text-slate-300 mb-2 font-bold uppercase tracking-widest">Mastered: <span id="win-mode-name" class="text-blue-400"></span></p>
+            <p class="text-white text-2xl font-black mb-6">Total Score: <span id="win-score-display" class="text-emerald-400">0</span></p>
             <input type="text" id="win-username-input" placeholder="ENTER NAME" class="w-full p-4 bg-slate-900 border-2 border-slate-700 rounded-xl mb-4 text-center font-bold text-white outline-none focus:border-emerald-500">
-            <button onclick="saveScore(true)" class="w-full bg-emerald-600 p-4 rounded-xl font-black mb-4">SAVE SCORE</button>
+            <button id="win-save-btn" onclick="saveScore(true)" class="w-full bg-emerald-600 p-4 rounded-xl font-black mb-4 hover:bg-emerald-500 transition-colors">SAVE SCORE</button>
             <div class="flex gap-2">
-                <button onclick="restartGame()" class="flex-1 bg-blue-600 p-3 rounded-xl font-bold uppercase text-sm">Play Mode Again</button>
-                <button onclick="location.reload()" class="flex-1 bg-slate-700 p-3 rounded-xl font-bold uppercase text-sm">Main Menu</button>
+                <button onclick="restartGame()" class="flex-1 bg-blue-600 p-3 rounded-xl font-bold uppercase text-sm hover:bg-blue-500 transition">Play Mode Again</button>
+                <button onclick="location.reload()" class="flex-1 bg-slate-700 p-3 rounded-xl font-bold uppercase text-sm hover:bg-slate-600 transition">Main Menu</button>
             </div>
         </div>
     </div>
@@ -163,9 +184,7 @@
             <button id="save-btn" onclick="saveScore(false)" class="w-full bg-emerald-600 p-3 rounded-xl font-black mb-4">SUBMIT SCORE</button>
             
             <div class="flex gap-3">
-                <!-- RETRY BUTTON: Restarts the same mode -->
                 <button onclick="restartGame()" class="flex-1 bg-blue-600 p-3 rounded-xl font-black hover:bg-blue-500 transition shadow-lg">RETRY</button>
-                <!-- EXIT BUTTON: Reloads to main menu -->
                 <button onclick="location.reload()" class="flex-1 bg-slate-700 p-3 rounded-xl font-black hover:bg-slate-600 transition shadow-lg">EXIT</button>
             </div>
         </div>
@@ -222,10 +241,13 @@
         let width = container.clientWidth, height = container.clientHeight;
         const svg = d3.select("#map-container").append("svg").attr("width", width).attr("height", height);
         const g = svg.append("g");
+
         const projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
         const path = d3.geoPath().projection(projection);
 
-        const zoom = d3.zoom().scaleExtent([1, 60]).translateExtent([[-width/2, -height/4], [width*1.5, height*1.2]])
+        const zoom = d3.zoom()
+            .scaleExtent([1, 60])
+            .translateExtent([[-width/2, -height/4], [width*1.5, height*1.2]])
             .on("zoom", (event) => {
                 const k = event.transform.k;
                 g.attr('transform', event.transform);
@@ -246,12 +268,14 @@
                             node.classed("hidden-label", true); else node.classed("hidden-label", false);
                     });
             });
+
         svg.call(zoom);
 
         function getLabelTransform(d) {
             const overrides = { "AND": [1.52, 42.5], "LUX": [6.13, 49.61], "FRA": [2.4, 46.5], "USA": [-98.5, 39.0], "CAN": [-100.0, 60.0], "RUS": [90.0, 60.0], "NOR": [9.5, 62.5], "HRV": [16.2, 45.4], "JPN": [138.0, 36.5], "CHL": [-71.5, -30.6] };
             if (overrides[d.id]) { const proj = projection(overrides[d.id]); return `translate(${proj[0]}, ${proj[1]})`; }
-            const centroid = path.centroid(d); return !isNaN(centroid[0]) ? `translate(${centroid})` : "translate(-1000,-1000)";
+            const centroid = path.centroid(d);
+            return !isNaN(centroid[0]) ? `translate(${centroid})` : "translate(-1000,-1000)";
         }
 
         d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
@@ -264,10 +288,14 @@
             g.selectAll("*").remove();
             const mapCountryIDs = mapDataFeatures.map(f => f.id);
             availableCountries = Object.keys(dict).filter(id => mapCountryIDs.includes(id));
+            
             g.selectAll("path").data(mapDataFeatures).join("path")
                 .attr("class", d => availableCountries.includes(d.id) ? "country" : "non-playable")
                 .attr("d", path).attr("id", d => "country-" + d.id)
-                .on("click", (event, d) => { if (availableCountries.includes(d.id)) handleCountryClick(event, d); });
+                .on("click", (event, d) => {
+                    if (availableCountries.includes(d.id)) handleCountryClick(event, d);
+                });
+
             g.selectAll(".country-label").data(mapDataFeatures.filter(d => availableCountries.includes(d.id))).join("text")
                 .attr("class", "country-label hidden-label").attr("id", d => "label-" + d.id).attr("transform", d => getLabelTransform(d)).text(d => dict[d.id].name);
         }
@@ -288,23 +316,41 @@
 
         function startRound() {
             isInputLocked = false;
-            if (unplayedCountries.length === 0) { showWinScreen(); return; }
+            if (unplayedCountries.length === 0) {
+                showWinScreen();
+                return;
+            }
             const randomIndex = Math.floor(Math.random() * unplayedCountries.length);
             currentTarget = unplayedCountries[randomIndex];
             unplayedCountries.splice(randomIndex, 1);
             document.getElementById("flag-display").src = `https://flagcdn.com/w320/${activeDictionary[currentTarget].code2}.png`;
         }
+        
+        window.refreshFlag = function() {
+            if (!currentTarget) return;
+            const flagImg = document.getElementById("flag-display");
+            flagImg.classList.add('hidden');
+            setTimeout(() => {
+                flagImg.src = `https://flagcdn.com/w320/${activeDictionary[currentTarget].code2}.png?v=${new Date().getTime()}`;
+            }, 50);
+        };
 
         function handleCountryClick(event, d) {
             if (isInputLocked) return;
             if (d3.select("#country-" + d.id).classed("guessed-correctly")) return;
+
             isInputLocked = true;
             if (d.id === currentTarget) {
-                playCorrectSound();
                 window.score++; 
                 document.getElementById("score-display").innerText = `STREAK: ${window.score}/${availableCountries.length}`;
                 d3.select("#country-" + d.id).classed("guessed-correctly", true);
-                setTimeout(startRound, 400);
+                
+                if (unplayedCountries.length === 0) {
+                    setTimeout(showWinScreen, 400);
+                } else {
+                    playCorrectSound();
+                    setTimeout(startRound, 400);
+                }
             } else {
                 playIncorrectSound();
                 d3.select("#country-" + d.id).classed("incorrect-flash", true);
@@ -320,17 +366,35 @@
         }
 
         function showWinScreen() {
-            playWinSound(); createConfetti();
+            playWinSound(); 
+            createConfetti();
             document.getElementById("win-mode-name").innerText = window.currentMode.toUpperCase();
-            document.getElementById("win-score").innerText = window.score;
+            document.getElementById("win-score-display").innerText = window.score;
+            
+            if (!document.getElementById("victory-song")) {
+                const iframe = document.createElement("iframe");
+                iframe.id = "victory-song";
+                iframe.width = "1";
+                iframe.height = "1";
+                iframe.style.position = "absolute";
+                iframe.style.top = "-9999px";
+                iframe.style.opacity = "0";
+                iframe.src = "https://www.youtube.com/embed/eTOD8cbh7yc?autoplay=1&controls=0";
+                iframe.allow = "autoplay";
+                document.body.appendChild(iframe);
+            }
+
             document.getElementById("win-overlay").classList.remove("hidden");
             document.getElementById("win-overlay").classList.add("flex");
         }
 
-        // UPDATED RESTART LOGIC: Directly restarts the game mode
         window.restartGame = function() {
             document.getElementById("game-over-overlay").classList.add("hidden");
             document.getElementById("win-overlay").classList.add("hidden");
+            
+            const victorySong = document.getElementById("victory-song");
+            if (victorySong) victorySong.remove();
+            
             startGame(window.currentMode);
         }
     </script>
